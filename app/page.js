@@ -7,14 +7,16 @@ import { Play, RefreshCw, Zap } from 'lucide-react';
 export default function Home() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
-  const itemsRef = useRef([]);
+  const runnerRef = useRef(null);
+  const bodiesRef = useRef([]);
   const [gravityEnabled, setGravityEnabled] = useState(false);
 
   const skills = ['Next.js', 'React', 'Tailwind CSS', 'Matter.js', 'JavaScript', 'UI/UX', 'Git', 'Vercel'];
 
   useEffect(() => {
-    const { Engine, Render, Runner, Bodies, Composite, Mouse, MouseConstraint, World } = Matter;
+    const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint } = Matter;
 
+    // Initialize Engine
     const engine = Engine.create({
       gravity: { x: 0, y: 0, scale: 0.001 }
     });
@@ -23,6 +25,7 @@ export default function Home() {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
+    // Render overlay canvas
     const render = Render.create({
       element: sceneRef.current,
       engine: engine,
@@ -34,138 +37,109 @@ export default function Home() {
       }
     });
 
-    // Collision Masks (0x0001 = Walls/Mouse, 0x0002 = UI Elements)
-    const WALL_CATEGORY = 0x0001;
-    const ITEM_CATEGORY = 0x0002;
-
-    // Screen Boundary Walls
-    const ground = Bodies.rectangle(width / 2, height + 50, width * 2, 100, {
-      isStatic: true,
-      collisionFilter: { category: WALL_CATEGORY }
-    });
-    const leftWall = Bodies.rectangle(-50, height / 2, 100, height * 2, {
-      isStatic: true,
-      collisionFilter: { category: WALL_CATEGORY }
-    });
-    const rightWall = Bodies.rectangle(width + 50, height / 2, 100, height * 2, {
-      isStatic: true,
-      collisionFilter: { category: WALL_CATEGORY }
-    });
-    const ceiling = Bodies.rectangle(width / 2, -50, width * 2, 100, {
-      isStatic: true,
-      collisionFilter: { category: WALL_CATEGORY }
-    });
+    // Outer Screen Boundaries
+    const ground = Bodies.rectangle(width / 2, height + 50, width * 2, 100, { isStatic: true });
+    const leftWall = Bodies.rectangle(-50, height / 2, 100, height * 2, { isStatic: true });
+    const rightWall = Bodies.rectangle(width + 50, height / 2, 100, height * 2, { isStatic: true });
+    const ceiling = Bodies.rectangle(width / 2, -50, width * 2, 100, { isStatic: true });
 
     World.add(engine.world, [ground, leftWall, rightWall, ceiling]);
 
-    // Measure HTML elements after DOM renders
-    const items = [];
-    const timer = setTimeout(() => {
-      const elements = document.querySelectorAll('.physics-item');
-
-      elements.forEach((el) => {
-        const rect = el.getBoundingClientRect();
-
-        const body = Bodies.rectangle(
-          rect.left + rect.width / 2,
-          rect.top + rect.height / 2,
-          rect.width,
-          rect.height,
-          {
-            restitution: 0.5,
-            friction: 0.1,
-            frictionAir: 0.04, // Air resistance prevents runaway speed
-            isStatic: true,
-            // CRITICAL FIX: Only collide with Walls (WALL_CATEGORY), NOT with other items!
-            collisionFilter: {
-              category: ITEM_CATEGORY,
-              mask: WALL_CATEGORY
-            },
-            render: { fillStyle: 'transparent' }
-          }
-        );
-
-        body.domElement = el;
-
-        // Lock exact dimensions so flexbox doesn't distort layout on transform
-        el.style.width = `${rect.width}px`;
-        el.style.height = `${rect.height}px`;
-
-        items.push(body);
-      });
-
-      itemsRef.current = items;
-      World.add(engine.world, items);
-    }, 300);
-
-    // Mouse drag interaction
-    const mouse = Mouse.create(render.canvas);
+    // Attach mouse listener directly to document body (prevents (0,0) top-left snapping)
+    const mouse = Mouse.create(document.body);
     const mouseConstraint = MouseConstraint.create(engine, {
       mouse: mouse,
-      constraint: { stiffness: 0.2, render: { visible: false } },
-      collisionFilter: { mask: ITEM_CATEGORY }
+      constraint: { stiffness: 0.2, render: { visible: false } }
     });
     World.add(engine.world, mouseConstraint);
 
-    // Sync HTML positions to Matter.js coordinates
+    // Sync HTML element positions to Matter.js body coordinates
     Matter.Events.on(engine, 'afterUpdate', () => {
-      itemsRef.current.forEach((body) => {
-        if (body.domElement && !body.isStatic) {
+      bodiesRef.current.forEach((body) => {
+        if (body.domElement) {
           const { x, y } = body.position;
           const angle = body.angle;
+          const w = body.domWidth;
+          const h = body.domHeight;
 
-          body.domElement.style.position = 'fixed';
-          body.domElement.style.left = '0px';
-          body.domElement.style.top = '0px';
-          body.domElement.style.transform = `translate3d(${x - body.domElement.offsetWidth / 2}px, ${y - body.domElement.offsetHeight / 2}px, 0px) rotate(${angle}rad)`;
-          body.domElement.style.zIndex = '50';
+          body.domElement.style.transform = `translate3d(${x - w / 2}px, ${y - h / 2}px, 0px) rotate(${angle}rad)`;
         }
       });
     });
 
     Render.run(render);
     const runner = Runner.create();
+    runnerRef.current = runner;
     Runner.run(runner, engine);
 
     return () => {
-      clearTimeout(timer);
       Render.stop(render);
       Runner.stop(runner);
-      Composite.clear(engine.world);
+      World.clear(engine.world);
       Engine.clear(engine);
     };
   }, []);
 
-  const toggleGravity = () => {
-    if (!engineRef.current) return;
-    const isNowActive = !gravityEnabled;
-    setGravityEnabled(isNowActive);
+  // Takes a real-time snapshot of DOM positions and converts them into physics bodies
+  const activatePhysics = (applyBlast = false) => {
+    if (!engineRef.current || gravityEnabled) return;
 
-    engineRef.current.gravity.y = isNowActive ? 1 : 0;
+    const { Bodies, World, Body } = Matter;
+    const elements = document.querySelectorAll('.physics-item');
+    const newBodies = [];
 
-    itemsRef.current.forEach((body) => {
-      Matter.Body.setStatic(body, !isNowActive);
-      if (isNowActive) {
-        // Small initial nudge
-        Matter.Body.setVelocity(body, {
+    elements.forEach((el) => {
+      // 1. Snapshot exact screen position before altering CSS
+      const rect = el.getBoundingClientRect();
+
+      // 2. Freeze dimensions & convert to fixed positioning seamlessly
+      el.style.width = `${rect.width}px`;
+      el.style.height = `${rect.height}px`;
+      el.style.position = 'fixed';
+      el.style.left = '0px';
+      el.style.top = '0px';
+      el.style.margin = '0px';
+      el.style.zIndex = '40';
+      el.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0px)`;
+
+      // 3. Instantiate dynamic Matter.js body at measured center
+      const body = Bodies.rectangle(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        rect.width,
+        rect.height,
+        {
+          restitution: 0.6,
+          friction: 0.1,
+          frictionAir: 0.02
+        }
+      );
+
+      body.domElement = el;
+      body.domWidth = rect.width;
+      body.domHeight = rect.height;
+
+      if (applyBlast) {
+        Body.applyForce(body, body.position, {
+          x: (Math.random() - 0.5) * 0.08,
+          y: -0.12
+        });
+      } else {
+        Body.setVelocity(body, {
           x: (Math.random() - 0.5) * 2,
           y: Math.random() * 2
         });
       }
-    });
-  };
 
-  const blastOff = () => {
-    if (!engineRef.current) return;
-    itemsRef.current.forEach((body) => {
-      Matter.Body.setStatic(body, false);
-      Matter.Body.applyForce(body, body.position, {
-        x: (Math.random() - 0.5) * 0.05,
-        y: -0.1
-      });
+      newBodies.push(body);
     });
-    setGravityEnabled(true);
+
+    bodiesRef.current = newBodies;
+    World.add(engineRef.current.world, newBodies);
+
+    // Turn on downwards gravity
     engineRef.current.gravity.y = 1;
+    setGravityEnabled(true);
   };
 
   const resetUI = () => {
@@ -174,9 +148,10 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
+      {/* Physics Overlay Canvas */}
       <div ref={sceneRef} className="absolute inset-0 pointer-events-none z-10" />
 
-      {/* Hero Section */}
+      {/* Hero Content */}
       <div className="relative z-20 flex flex-col items-center justify-center pt-20 px-4 text-center">
         <h1 className="physics-item inline-block text-5xl md:text-7xl font-extrabold bg-gradient-to-r from-cyan-400 to-blue-600 bg-clip-text text-transparent mb-6 p-4 rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-md">
           Breaking the 4th Wall
@@ -201,19 +176,20 @@ export default function Home() {
       {/* Control Dock */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 p-3 rounded-2xl border border-slate-700 bg-slate-900/90 backdrop-blur-xl shadow-2xl">
         <button
-          onClick={toggleGravity}
+          onClick={() => activatePhysics(false)}
+          disabled={gravityEnabled}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all ${
             gravityEnabled
-              ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/40'
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
               : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/40'
           }`}
         >
           <Play className="w-4 h-4 fill-current" />
-          {gravityEnabled ? 'Restore Gravity' : 'Turn Off Gravity'}
+          {gravityEnabled ? 'Gravity Active' : 'Turn Off Gravity'}
         </button>
 
         <button
-          onClick={blastOff}
+          onClick={() => activatePhysics(true)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/40 transition-all"
         >
           <Zap className="w-4 h-4" />
