@@ -1,6 +1,7 @@
 import './globals.css';
 import Link from 'next/link';
-import { Beaker, Github } from 'lucide-react';
+// Removed Twitter and replaced with Globe for the footer
+import { Beaker, Github, Globe } from 'lucide-react';
 
 export const metadata = {
   title: 'Physics Lab | Interactive Learning',
@@ -48,7 +49,7 @@ export default function RootLayout({ children }) {
             </p>
             <div className="flex gap-4 text-slate-500">
               <a href="#" className="hover:text-cyan-400 transition-colors"><Github className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-cyan-400 transition-colors"><Twitter className="w-5 h-5" /></a>
+              <a href="#" className="hover:text-cyan-400 transition-colors"><Globe className="w-5 h-5" /></a>
             </div>
           </div>
         </footer>
