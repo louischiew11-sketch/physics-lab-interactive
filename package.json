@@ -11,16 +11,16 @@
   "dependencies": {
     "canvas-confetti": "^1.9.4",
     "framer-motion": "^12.43.0",
-    "lucide-react": "^1.27.0",
+    "lucide-react": "^1.28.0",
     "matter-js": "^0.20.0",
-    "next": "16.2.12",
+    "next": "^9.3.3",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint": "^10.8.0",
+    "eslint-config-next": "^0.2.4",
     "tailwindcss": "^4"
   }
 }
