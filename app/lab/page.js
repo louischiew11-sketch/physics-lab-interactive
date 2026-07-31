@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
-import Link from 'next/link'; // Added for the Home button
-import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home } from 'lucide-react'; // Added Home icon
+import Link from 'next/link';
+import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home } from 'lucide-react';
 
 export default function Lab() {
   const sceneRef = useRef(null);
@@ -12,6 +12,9 @@ export default function Lab() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [lesson, setLesson] = useState(1);
   const [gravityType, setGravityType] = useState('Earth');
+  
+  // 🚀 FIX 1: Dedicated reset trigger to rebuild the whole engine cleanly
+  const [resetTrigger, setResetTrigger] = useState(0);
 
   // Customizer State
   const [showCustomizer, setShowCustomizer] = useState(false);
@@ -30,10 +33,10 @@ export default function Lab() {
   useEffect(() => {
     const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint, Composites, Constraint } = Matter;
 
-    const engine = Engine.create({ positionIterations: 12, velocityIterations: 12 });
+    // Increased iterations to help prevent tunneling
+    const engine = Engine.create({ positionIterations: 16, velocityIterations: 16 });
     engineRef.current = engine;
 
-    // Fixed canvas height since the header is gone now
     const width = window.innerWidth;
     const height = window.innerHeight; 
 
@@ -53,7 +56,10 @@ export default function Lab() {
       setGravityType('Earth');
 
       if (lesson === 2) {
-        World.add(engine.world, Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, { isStatic: true, angle: Math.PI / 8, render: { fillStyle: '#334155' } }));
+        // Set explicit friction on the ramp
+        World.add(engine.world, Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, { 
+          isStatic: true, angle: Math.PI / 8, friction: 0.5, render: { fillStyle: '#334155' } 
+        }));
       }
       if (lesson === 5) {
         const cradle = Composites.newtonsCradle(width / 2 - 100, 100, 5, 20, 200);
@@ -71,8 +77,9 @@ export default function Lab() {
       }
       if (lesson === 8) {
         const group = Matter.Body.nextGroup(true);
+        // 🚀 FIX 2: Thicker, denser bridge planks to prevent box phasing through
         const bridge = Composites.stack(width * 0.2, height * 0.4, 10, 1, 0, 0, (x, y) => 
-          Bodies.rectangle(x, y, 50, 20, { collisionFilter: { group: group }, render: { fillStyle: '#64748b' } })
+          Bodies.rectangle(x, y, 50, 25, { collisionFilter: { group: group }, density: 0.05, render: { fillStyle: '#64748b' } })
         );
         Composites.chain(bridge, 0.5, 0, -0.5, 0, { stiffness: 0.9, length: 2, render: { visible: false } });
         World.add(engine.world, [
@@ -82,7 +89,10 @@ export default function Lab() {
         ]);
       }
       if (lesson === 9) {
-        const softBody = Composites.softBody(width / 2, 100, 5, 5, 0, 0, true, 18, { render: { fillStyle: '#10b981' } });
+        // 🚀 FIX 3: Added gaps (2, 2) and lowered radius (16) to stop immediate particle tangling
+        const softBody = Composites.softBody(width / 2, 100, 5, 5, 2, 2, true, 16, { 
+          restitution: 0.5, friction: 0.05, render: { fillStyle: '#10b981' } 
+        });
         World.add(engine.world, softBody);
       }
       if (lesson === 10) {
@@ -110,7 +120,8 @@ export default function Lab() {
       Engine.clear(engine);
       if (render.canvas) render.canvas.remove();
     };
-  }, [lesson]); 
+  // 🚀 FIX 1: Added resetTrigger to the dependency array. When it changes, the whole engine unmounts and rebuilds cleanly.
+  }, [lesson, resetTrigger]); 
 
   const spawn = (type) => {
     if (!engineRef.current) return;
@@ -124,12 +135,17 @@ export default function Lab() {
     switch(type) {
       case 'rubber': newBody = Bodies.circle(cx, 100, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } }); break;
       case 'bowling': newBody = Bodies.circle(cx, 100, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } }); break;
-      case 'ice': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.001, render: { fillStyle: '#bae6fd' } }); break;
-      case 'wood': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.4, render: { fillStyle: '#d97706' } }); break;
+      // 🚀 FIX 4: Added "chamfer" to blocks so their sharp corners don't dig into the ramp
+      case 'ice': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.001, chamfer: { radius: 4 }, render: { fillStyle: '#bae6fd' } }); break;
+      case 'wood': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.4, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
+      
       case 'feather': newBody = Bodies.circle(w * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
       case 'iron': newBody = Bodies.circle(w * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
       case 'wrecking-ball': newBody = Bodies.circle(w * 0.3, h * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
-      case 'heavy-box': newBody = Bodies.rectangle(cx, 50, 60, 60, { density: 0.08, render: { fillStyle: '#9333ea' } }); break;
+      
+      // 🚀 FIX 2: Added slight air friction so it doesn't fall too fast and tunnel through the bridge
+      case 'heavy-box': newBody = Bodies.rectangle(cx, 50, 60, 60, { density: 0.1, frictionAir: 0.01, chamfer: { radius: 4 }, render: { fillStyle: '#9333ea' } }); break;
+      
       case 'particles': 
         for(let i=0; i<30; i++) World.add(engineRef.current.world, Bodies.circle(cx + (Math.random()*100-50), 50, 8, { render: { fillStyle: '#eab308' } }));
         break;
@@ -138,7 +154,7 @@ export default function Lab() {
         const options = { restitution: mat.restitution, friction: mat.friction, density: mat.density * customMassMult, render: { fillStyle: mat.color } };
         const startX = lesson === 2 ? w * 0.2 : cx;
         if (customShape === 'circle') newBody = Bodies.circle(startX, 100, customSize, options);
-        else if (customShape === 'square') newBody = Bodies.rectangle(startX, 100, customSize * 2, customSize * 2, options);
+        else if (customShape === 'square') newBody = Bodies.rectangle(startX, 100, customSize * 2, customSize * 2, { ...options, chamfer: { radius: 4 } });
         else if (customShape === 'triangle') newBody = Bodies.polygon(startX, 100, 3, customSize * 1.2, options);
         break;
     }
@@ -151,13 +167,9 @@ export default function Lab() {
     engineRef.current.gravity.y = type === 'Earth' ? 1 : type === 'Moon' ? 0.16 : 2.4;
   };
 
+  // 🚀 FIX 1: Triggers the useEffect to cleanly rebuild the environment
   const clearLab = () => {
-    if (!engineRef.current) return;
-    const dynamicBodies = engineRef.current.world.bodies.filter(b => !b.isStatic);
-    const composites = engineRef.current.world.composites;
-    const constraints = engineRef.current.world.constraints;
-    Matter.World.remove(engineRef.current.world, [...dynamicBodies, ...composites, ...constraints]);
-    setLesson(lesson);
+    setResetTrigger(prev => prev + 1);
   };
 
   const lessonData = {
@@ -185,7 +197,6 @@ export default function Lab() {
           <div className={`flex items-center justify-between ${isMinimized ? '' : 'mb-4 pb-4 border-b border-slate-800'}`}>
             <div className="flex items-center gap-2">
               
-              {/* NEW: Home Button */}
               {!isMinimized && (
                 <Link href="/" className="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700 rounded-lg transition mr-1" title="Back to Home">
                   <Home className="w-4 h-4" />
@@ -209,8 +220,6 @@ export default function Lab() {
               <p className="text-slate-400 text-sm mb-4">{currentLesson.desc}</p>
               
               <div className="flex flex-wrap gap-2 mb-6">
-                
-                {/* BUG FIX: Added ?. before map to prevent crashing if buttons array is missing */}
                 {currentLesson.buttons?.map((btn, i) => (
                   <button key={i} onClick={btn.action} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700 transition">
                     {btn.label}
@@ -271,7 +280,7 @@ export default function Lab() {
       <div ref={sceneRef} className="absolute inset-0 z-10" />
 
       <button onClick={clearLab} className="absolute bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
-        <RefreshCw className="w-4 h-4"/> Reset
+        <RefreshCw className="w-4 h-4"/> Reset Scene
       </button>
 
     </div>
