@@ -14,19 +14,16 @@ export default function Lab() {
   const [gravityType, setGravityType] = useState('Earth');
   const [resetTrigger, setResetTrigger] = useState(0);
 
-  // Customizer State
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [customShape, setCustomShape] = useState('circle');
   const [customMaterial, setCustomMaterial] = useState('wood');
   const [customSize, setCustomSize] = useState(40);
   const [customMassMult, setCustomMassMult] = useState(1);
 
-  // Quiz State
   const [showQuiz, setShowQuiz] = useState(false);
-  const [quizState, setQuizState] = useState('idle'); // 'idle', 'correct', 'incorrect'
+  const [quizState, setQuizState] = useState('idle');
   const [selectedAnswer, setSelectedAnswer] = useState(null);
 
-  // Reset quiz logic when changing lessons
   useEffect(() => {
     setShowQuiz(false);
     setQuizState('idle');
@@ -42,7 +39,6 @@ export default function Lab() {
 
   useEffect(() => {
     const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint, Composites, Constraint } = Matter;
-
     const engine = Engine.create({ positionIterations: 16, velocityIterations: 16 });
     engineRef.current = engine;
 
@@ -162,56 +158,17 @@ export default function Lab() {
 
   const clearLab = () => setResetTrigger(prev => prev + 1);
 
-  // Lesson data with comprehensive Quizzes!
   const lessonData = {
-    1: { 
-      title: 'Restitution', desc: 'Observe kinetic energy retention (bounciness).', 
-      buttons: [{ label: 'Rubber', action: () => spawn('rubber') }, { label: 'Bowling', action: () => spawn('bowling') }],
-      quiz: { question: "Which material property determines how much kinetic energy is retained after a collision?", options: ["Density", "Restitution", "Friction", "Mass"], answer: 1, explanation: "Restitution (bounciness) measures how much kinetic energy remains after an impact. A restitution of 1.0 is perfectly elastic!" }
-    },
-    2: { 
-      title: 'Friction', desc: 'Friction resists sliding. Drop blocks on the ramp.', 
-      buttons: [{ label: 'Ice', action: () => spawn('ice') }, { label: 'Wood', action: () => spawn('wood') }],
-      quiz: { question: "What force resists the blocks as they slide down the ramp?", options: ["Momentum", "Tension", "Gravity", "Friction"], answer: 3, explanation: "Friction is the resistance that one surface or object encounters when moving over another. Ice has low friction, so it slides faster!" }
-    },
-    3: { 
-      title: 'Gravity', desc: 'Change planetary mass.', isGravity: true,
-      quiz: { question: "If you drop an object on Jupiter, why does it fall faster than on Earth?", options: ["Higher planetary mass creates stronger gravity", "It has no air resistance", "Magnetic pull", "The distance is shorter"], answer: 0, explanation: "Gravity is determined by mass. Because Jupiter is massive, its gravitational acceleration (2.4G) pulls objects down much faster." }
-    },
-    4: { 
-      title: 'Air Resistance', desc: 'Drag affects falling speed regardless of mass.', 
-      buttons: [{ label: 'Feather', action: () => spawn('feather') }, { label: 'Iron Ball', action: () => spawn('iron') }],
-      quiz: { question: "Why does the feather fall slower than the iron ball on Earth?", options: ["It has less mass", "Air resistance pushes against its large surface area", "Gravity pulls it less", "It has lower restitution"], answer: 1, explanation: "In a vacuum, they would fall at the exact same speed! But in Earth's atmosphere, the feather's large surface area catches the air, creating drag." }
-    },
-    5: { 
-      title: 'Momentum', desc: 'Conservation of momentum. Drag the end ball of the Cradle and drop it!', buttons: [],
-      quiz: { question: "In a Newton's Cradle, what principle causes the ball on the opposite end to swing out?", options: ["Conservation of Momentum", "Friction", "Air Resistance", "Tension"], answer: 0, explanation: "Momentum equals mass times velocity. The energy transfers cleanly through the stationary balls until it reaches the end, conserving the momentum!" }
-    },
-    6: { 
-      title: 'Kinetics', desc: 'Transfer massive force into a stable structure.', 
-      buttons: [{ label: 'Drop Wrecking Ball', action: () => spawn('wrecking-ball') }],
-      quiz: { question: "When the wrecking ball hits the pyramid, where does its kinetic energy go?", options: ["It vanishes", "It turns into gravity", "It transfers into the blocks, causing them to scatter", "It increases the ball's mass"], answer: 2, explanation: "Energy cannot be destroyed! The massive kinetic energy of the heavy wrecking ball transfers directly into the lighter blocks." }
-    },
-    7: { 
-      title: 'Elasticity', desc: 'Springs & Constraints. Drag the ball and release it to slingshot it.', 
-      buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }],
-      quiz: { question: "What provides the restorative force that pulls the ball back when you stretch it?", options: ["Gravity", "Friction", "Restitution", "Elastic Tension (Spring)"], answer: 3, explanation: "The constraint acts like a spring. Stretching it builds potential energy, which converts back to kinetic energy when released!" }
-    },
-    8: { 
-      title: 'Tension', desc: 'Suspension bridge held by constraints.', 
-      buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }],
-      quiz: { question: "Which force primarily keeps the bridge from collapsing under the heavy box?", options: ["Compression", "Tension from the chains", "Friction", "Restitution"], answer: 1, explanation: "The bridge planks are held up by tension—a pulling force acting along the invisible constraints anchored to the sides." }
-    },
-    9: { 
-      title: 'Soft Bodies', desc: 'Deformable composite structures.', 
-      buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }],
-      quiz: { question: "Why doesn't the soft-body Jello block shatter upon impact?", options: ["Flexible constraint springs absorb the energy", "It has zero mass", "It ignores gravity", "High friction"], answer: 0, explanation: "A soft body is made of many small particles connected by elastic springs. These springs stretch and deform to absorb the impact energy." }
-    },
-    10: { 
-      title: 'Granular Flow', desc: 'Thousands of particles acting like fluid.', 
-      buttons: [{ label: 'Spawn 30 Particles', action: () => spawn('particles') }],
-      quiz: { question: "How do large amounts of small, solid particles behave when poured into a funnel?", options: ["Like a single solid block", "Like a fluid", "They float away", "They bounce perfectly"], answer: 1, explanation: "When thousands of tiny rigid bodies interact with gravity and boundaries, their collective movement simulates fluid dynamics!" }
-    },
+    1: { title: 'Restitution', desc: 'Observe kinetic energy retention (bounciness).', buttons: [{ label: 'Rubber', action: () => spawn('rubber') }, { label: 'Bowling', action: () => spawn('bowling') }], quiz: { question: "Which material property determines how much kinetic energy is retained after a collision?", options: ["Density", "Restitution", "Friction", "Mass"], answer: 1, explanation: "Restitution (bounciness) measures how much kinetic energy remains after an impact." } },
+    2: { title: 'Friction', desc: 'Friction resists sliding.', buttons: [{ label: 'Ice', action: () => spawn('ice') }, { label: 'Wood', action: () => spawn('wood') }], quiz: { question: "What force resists the blocks as they slide down the ramp?", options: ["Momentum", "Tension", "Gravity", "Friction"], answer: 3, explanation: "Friction is the resistance that one surface or object encounters when moving over another." } },
+    3: { title: 'Gravity', desc: 'Change planetary mass.', isGravity: true, quiz: { question: "If you drop an object on Jupiter, why does it fall faster than on Earth?", options: ["Higher planetary mass creates stronger gravity", "It has no air resistance", "Magnetic pull", "The distance is shorter"], answer: 0, explanation: "Gravity is determined by mass. Jupiter is massive, pulling objects down much faster." } },
+    4: { title: 'Air Resistance', desc: 'Drag affects falling speed.', buttons: [{ label: 'Feather', action: () => spawn('feather') }, { label: 'Iron Ball', action: () => spawn('iron') }], quiz: { question: "Why does the feather fall slower than the iron ball on Earth?", options: ["It has less mass", "Air resistance pushes against its large surface area", "Gravity pulls it less", "It has lower restitution"], answer: 1, explanation: "In a vacuum, they fall at the same speed! On Earth, the feather catches the air, creating drag." } },
+    5: { title: 'Momentum', desc: 'Conservation of momentum. Drag the end ball!', buttons: [], quiz: { question: "In a Newton's Cradle, what principle causes the ball on the opposite end to swing out?", options: ["Conservation of Momentum", "Friction", "Air Resistance", "Tension"], answer: 0, explanation: "The energy transfers cleanly through the stationary balls until it reaches the end, conserving the momentum!" } },
+    6: { title: 'Kinetics', desc: 'Transfer massive force into a structure.', buttons: [{ label: 'Drop Wrecking Ball', action: () => spawn('wrecking-ball') }], quiz: { question: "When the wrecking ball hits the pyramid, where does its kinetic energy go?", options: ["It vanishes", "It turns into gravity", "It transfers into the blocks", "It increases the ball's mass"], answer: 2, explanation: "Energy cannot be destroyed! The kinetic energy transfers directly into the lighter blocks." } },
+    7: { title: 'Elasticity', desc: 'Springs & Constraints. Drag to slingshot.', buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }], quiz: { question: "What provides the restorative force that pulls the ball back?", options: ["Gravity", "Friction", "Restitution", "Elastic Tension"], answer: 3, explanation: "The constraint acts like a spring, converting potential energy back to kinetic energy!" } },
+    8: { title: 'Tension', desc: 'Suspension bridge held by constraints.', buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }], quiz: { question: "Which force primarily keeps the bridge from collapsing?", options: ["Compression", "Tension from the chains", "Friction", "Restitution"], answer: 1, explanation: "The bridge is held up by tension—a pulling force acting along the invisible constraints." } },
+    9: { title: 'Soft Bodies', desc: 'Deformable composite structures.', buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }], quiz: { question: "Why doesn't the soft-body Jello block shatter upon impact?", options: ["Flexible springs absorb the energy", "It has zero mass", "It ignores gravity", "High friction"], answer: 0, explanation: "The elastic springs stretch and deform to absorb the impact energy gracefully." } },
+    10: { title: 'Granular Flow', desc: 'Particles acting like fluid.', buttons: [{ label: 'Spawn 30 Particles', action: () => spawn('particles') }], quiz: { question: "How do large amounts of small, solid particles behave when poured?", options: ["Like a solid block", "Like a fluid", "They float away", "They bounce perfectly"], answer: 1, explanation: "When thousands of tiny rigid bodies interact, their collective movement simulates fluid dynamics!" } },
   };
 
   const currentLesson = lessonData[lesson];
@@ -219,7 +176,6 @@ export default function Lab() {
   return (
     <div className="relative h-screen w-full overflow-hidden">
       
-      {/* Quiz Modal Overlay */}
       {showQuiz && currentLesson.quiz && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl animate-in zoom-in-95">
@@ -231,15 +187,11 @@ export default function Lab() {
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
-            
             <p className="text-slate-300 mb-6 leading-relaxed">{currentLesson.quiz.question}</p>
-
             <div className="space-y-3 mb-6">
               {currentLesson.quiz.options.map((opt, idx) => {
                 const isSelected = selectedAnswer === idx;
                 const isCorrect = idx === currentLesson.quiz.answer;
-                
-                // Dynamic Button Styling based on Answer State
                 let btnClass = "w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-all duration-200 ";
                 if (quizState === 'idle') {
                   btnClass += "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:border-slate-500 hover:text-white";
@@ -248,24 +200,13 @@ export default function Lab() {
                   else if (isSelected && !isCorrect) btnClass += "border-rose-500 bg-rose-900/30 text-rose-400";
                   else btnClass += "border-slate-800 bg-slate-900/50 text-slate-500 opacity-50";
                 }
-
                 return (
-                  <button
-                    key={idx}
-                    disabled={quizState !== 'idle'}
-                    onClick={() => {
-                      setSelectedAnswer(idx);
-                      setQuizState(isCorrect ? 'correct' : 'incorrect');
-                    }}
-                    className={btnClass}
-                  >
+                  <button key={idx} disabled={quizState !== 'idle'} onClick={() => { setSelectedAnswer(idx); setQuizState(isCorrect ? 'correct' : 'incorrect'); }} className={btnClass}>
                     {opt}
                   </button>
                 );
               })}
             </div>
-
-            {/* Explanation Result Box */}
             {quizState !== 'idle' && (
               <div className={`p-4 rounded-xl flex items-start gap-3 animate-in slide-in-from-bottom-2 ${quizState === 'correct' ? 'bg-emerald-900/20 border border-emerald-800/50' : 'bg-rose-900/20 border border-rose-800/50'}`}>
                 {quizState === 'correct' ? <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" /> : <XCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />}
@@ -281,11 +222,12 @@ export default function Lab() {
         </div>
       )}
 
-      {/* HUD Menu */}
-      <div className="absolute top-6 left-6 z-30 pointer-events-none flex justify-between items-start max-h-[85vh] overflow-y-auto custom-scrollbar">
-        <div className={`bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl pointer-events-auto w-full transition-all duration-300 ease-in-out ${isMinimized ? 'max-w-xs p-4' : 'max-w-sm p-6'}`}>
+      {/* 🚀 HUD Menu - Now shrink-wraps on desktop (sm:w-fit) and handles mobile safe zones */}
+      <div className="absolute top-4 left-4 right-4 sm:right-auto sm:left-6 sm:top-6 z-30 pointer-events-none flex justify-between items-start max-h-[85vh] overflow-y-auto custom-scrollbar max-w-[calc(100vw-32px)]">
+        
+        <div className={`bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl pointer-events-auto transition-all duration-300 ease-in-out w-full sm:w-fit min-w-[280px] sm:max-w-md ${isMinimized ? 'p-3 sm:p-4' : 'p-4 sm:p-6'}`}>
           
-          <div className={`flex items-center justify-between ${isMinimized ? '' : 'mb-4 pb-4 border-b border-slate-800'}`}>
+          <div className={`flex items-center justify-between gap-4 ${isMinimized ? '' : 'mb-4 pb-4 border-b border-slate-800'}`}>
             <div className="flex items-center gap-2">
               {!isMinimized && (
                 <Link href="/" className="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700 rounded-lg transition mr-1" title="Back to Home">
@@ -293,9 +235,9 @@ export default function Lab() {
                 </Link>
               )}
               {!isMinimized && <button onClick={() => setLesson(Math.max(1, lesson - 1))} className="p-2 bg-slate-800 hover:bg-cyan-600 rounded-lg disabled:opacity-30 transition"><ChevronLeft className="w-4 h-4"/></button>}
-              <Activity className="text-cyan-400 w-5 h-5"/>
-              <h1 className="text-lg font-bold text-white whitespace-nowrap">
-                {isMinimized ? `L${lesson}` : `Lesson ${lesson}: ${currentLesson.title}`}
+              <Activity className="text-cyan-400 w-5 h-5 hidden sm:block"/>
+              <h1 className="text-base sm:text-lg font-bold text-white whitespace-nowrap">
+                {isMinimized ? `L${lesson}` : `Lesson ${lesson}`}
               </h1>
               {!isMinimized && <button onClick={() => setLesson(Math.min(10, lesson + 1))} className="p-2 bg-slate-800 hover:bg-cyan-600 rounded-lg disabled:opacity-30 transition"><ChevronRight className="w-4 h-4"/></button>}
             </div>
@@ -306,6 +248,7 @@ export default function Lab() {
           
           {!isMinimized && (
             <div className="animate-in fade-in">
+              <h2 className="text-cyan-400 font-semibold mb-1">{currentLesson.title}</h2>
               <p className="text-slate-400 text-sm mb-4">{currentLesson.desc}</p>
               
               <div className="flex flex-wrap gap-2 mb-6">
@@ -324,19 +267,14 @@ export default function Lab() {
                 )}
               </div>
 
-              {/* NEW: Knowledge Check Button */}
               {currentLesson.quiz && (
                 <div className="pt-4 border-t border-slate-800 mb-4">
-                  <button 
-                    onClick={() => setShowQuiz(true)}
-                    className="w-full flex justify-center items-center gap-2 py-2.5 bg-yellow-900/20 hover:bg-yellow-900/40 text-yellow-500 border border-yellow-700/50 rounded-lg text-sm font-semibold transition shadow-inner"
-                  >
+                  <button onClick={() => setShowQuiz(true)} className="w-full flex justify-center items-center gap-2 py-2.5 bg-yellow-900/20 hover:bg-yellow-900/40 text-yellow-500 border border-yellow-700/50 rounded-lg text-sm font-semibold transition shadow-inner">
                     <Lightbulb className="w-4 h-4" /> Test Your Knowledge
                   </button>
                 </div>
               )}
 
-              {/* Object Forge UI */}
               <div className="pt-4 border-t border-slate-800">
                 <button onClick={() => setShowCustomizer(!showCustomizer)} className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 text-sm font-medium transition w-full">
                   <Settings className="w-4 h-4" /> {showCustomizer ? 'Close Forge' : 'Open Forge'}
@@ -379,10 +317,12 @@ export default function Lab() {
         </div>
       </div>
 
-      <div ref={sceneRef} className="absolute inset-0 z-10" />
+      {/* 🚀 FIXED: Added `touch-none` to prevent mobile webpage scrolling while interacting with physics */}
+      <div ref={sceneRef} className="absolute inset-0 z-10 touch-none" />
 
-      <button onClick={clearLab} className="absolute bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
-        <RefreshCw className="w-4 h-4"/> Reset Scene
+      {/* Repositioned for mobile thumbs */}
+      <button onClick={clearLab} className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
+        <RefreshCw className="w-4 h-4"/> Reset
       </button>
 
     </div>
