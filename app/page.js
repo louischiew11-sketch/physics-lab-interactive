@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
-import { RefreshCw, PlusCircle, Activity, ChevronRight, ChevronLeft } from 'lucide-react';
+import { RefreshCw, Activity, ChevronRight, ChevronLeft } from 'lucide-react';
 
 export default function Home() {
   const sceneRef = useRef(null);
@@ -83,12 +83,13 @@ export default function Home() {
       Runner.stop(runner);
       World.clear(engine.world);
       Engine.clear(engine);
-      render.canvas.remove(); // Prevents multiple canvases from stacking up
+      if (render.canvas) {
+        render.canvas.remove(); // Prevents multiple canvases from stacking up
+      }
     };
-  }, [lesson]); // Re-builds the world anytime the lesson number changes
+  }, [lesson]); 
 
   // Spawns objects based on the current lesson
-  const spawnObject = (type```jsx
   const spawnObject = (type) => {
     if (!engineRef.current) return;
     const { Bodies, World } = Matter;
@@ -168,8 +169,8 @@ export default function Home() {
             <div className="space-y-4">
               <p className="text-slate-400 text-sm">Drop objects to see how different materials retain kinetic energy when they bounce.</p>
               <div className="flex gap-2">
-                <button onClick={() => spawnObject('rubber')} className="px-3 py-2 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm border border-cyan-800">Rubber Ball</button>
-                <button onClick={() => spawnObject('bowling')} className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm border border-slate-700">Bowling Ball</button>
+                <button onClick={() => spawnObject('rubber')} className="px-3 py-2 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm border border-cyan-800 hover:bg-cyan-800 transition">Rubber Ball</button>
+                <button onClick={() => spawnObject('bowling')} className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm border border-slate-700 hover:bg-slate-700 transition">Bowling Ball</button>
               </div>
             </div>
           )}
@@ -179,9 +180,9 @@ export default function Home() {
             <div className="space-y-4">
               <p className="text-slate-400 text-sm">Friction resists sliding motion. Drop these blocks on the ramp to see how friction values (0.01 to 0.9) affect their speed.</p>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => spawnObject('ice')} className="px-3 py-2 bg-sky-900/50 text-sky-300 rounded-lg text-sm border border-sky-800">Ice Block</button>
-                <button onClick={() => spawnObject('wood')} className="px-3 py-2 bg-amber-900/50 text-amber-300 rounded-lg text-sm border border-amber-800">Wood Block</button>
-                <button onClick={() => spawnObject('rubber-block')} className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm border border-slate-700">Rubber Block</button>
+                <button onClick={() => spawnObject('ice')} className="px-3 py-2 bg-sky-900/50 text-sky-300 rounded-lg text-sm border border-sky-800 hover:bg-sky-800 transition">Ice Block</button>
+                <button onClick={() => spawnObject('wood')} className="px-3 py-2 bg-amber-900/50 text-amber-300 rounded-lg text-sm border border-amber-800 hover:bg-amber-800 transition">Wood Block</button>
+                <button onClick={() => spawnObject('rubber-block')} className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm border border-slate-700 hover:bg-slate-700 transition">Rubber Block</button>
               </div>
             </div>
           )}
@@ -191,11 +192,11 @@ export default function Home() {
             <div className="space-y-4">
               <p className="text-slate-400 text-sm">Mass determines gravitational pull. Change the planet to see how acceleration changes!</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                <button onClick={() => changeGravity('Earth')} className={`px-3 py-2 rounded-lg text-sm border ${gravityType === 'Earth' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Earth (1G)</button>
-                <button onClick={() => changeGravity('Moon')} className={`px-3 py-2 rounded-lg text-sm border ${gravityType === 'Moon' ? 'bg-slate-300 text-slate-900' : 'bg-slate-800 text-slate-400'}`}>Moon (0.16G)</button>
-                <button onClick={() => changeGravity('Jupiter')} className={`px-3 py-2 rounded-lg text-sm border ${gravityType === 'Jupiter' ? 'bg-orange-700 text-white' : 'bg-slate-800 text-slate-400'}`}>Jupiter (2.4G)</button>
+                <button onClick={() => changeGravity('Earth')} className={`px-3 py-2 rounded-lg text-sm border transition ${gravityType === 'Earth' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>Earth (1G)</button>
+                <button onClick={() => changeGravity('Moon')} className={`px-3 py-2 rounded-lg text-sm border transition ${gravityType === 'Moon' ? 'bg-slate-300 text-slate-900 border-slate-400' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>Moon (0.16G)</button>
+                <button onClick={() => changeGravity('Jupiter')} className={`px-3 py-2 rounded-lg text-sm border transition ${gravityType === 'Jupiter' ? 'bg-orange-700 text-white border-orange-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>Jupiter (2.4G)</button>
               </div>
-              <button onClick={() => spawnObject('box')} className="px-3 py-2 bg-purple-900/50 text-purple-300 rounded-lg text-sm border border-purple-800 w-full">Drop Test Subject</button>
+              <button onClick={() => spawnObject('box')} className="px-3 py-2 bg-purple-900/50 hover:bg-purple-800 text-purple-300 rounded-lg text-sm border border-purple-800 w-full transition">Drop Test Subject</button>
             </div>
           )}
         </div>
