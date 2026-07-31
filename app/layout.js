@@ -1,6 +1,6 @@
 import './globals.css';
 import Link from 'next/link';
-import { Beaker, Github, Twitter } from 'lucide-react';
+import { Beaker, Github, X } from 'lucide-react';
 
 export const metadata = {
   title: 'Physics Lab | Interactive Learning',
