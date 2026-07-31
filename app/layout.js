@@ -26,8 +26,8 @@ export default function RootLayout({ children }) {
             <nav className="hidden md:flex gap-6 text-sm font-medium text-slate-300">
               <Link href="/" className="hover:text-cyan-400 transition-colors">Home</Link>
               <Link href="/lab" className="hover:text-cyan-400 transition-colors">Interactive Lab</Link>
-              <Link href="#" className="hover:text-cyan-400 transition-colors">Curriculum</Link>
-              <Link href="#" className="hover:text-cyan-400 transition-colors">About</Link>
+              <Link href="/curriculum" className="hover:text-cyan-400 transition-colors">Curriculum</Link>
+              <Link href="/about" className="hover:text-cyan-400 transition-colors">About</Link>
             </nav>
 
             <Link href="/lab" className="px-4 py-2 bg-slate-100 text-slate-900 font-semibold rounded-lg text-sm hover:bg-cyan-400 transition-colors">
