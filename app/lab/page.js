@@ -8,10 +8,7 @@ export default function Lab() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
   
-  // UI State
   const [isMinimized, setIsMinimized] = useState(false);
-
-  // Navigation & Environment State
   const [lesson, setLesson] = useState(1);
   const [gravityType, setGravityType] = useState('Earth');
 
@@ -20,9 +17,8 @@ export default function Lab() {
   const [customShape, setCustomShape] = useState('circle');
   const [customMaterial, setCustomMaterial] = useState('wood');
   const [customSize, setCustomSize] = useState(40);
-  const [customMassMult, setCustomMassMult] = useState(1); // 🚀 NEW: Mass multiplier (0.1x to 10x)
+  const [customMassMult, setCustomMassMult] = useState(1);
 
-  // Material Physics Definitions
   const materials = {
     rubber: { restitution: 0.95, friction: 0.1, density: 0.01, color: '#22d3ee', name: 'Rubber' },
     wood: { restitution: 0.4, friction: 0.4, density: 0.04, color: '#d97706', name: 'Wood' },
@@ -31,13 +27,14 @@ export default function Lab() {
   };
 
   useEffect(() => {
-    const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint } = Matter;
+    const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint, Composites, Constraint } = Matter;
 
     const engine = Engine.create({ positionIterations: 12, velocityIterations: 12 });
     engineRef.current = engine;
 
+    // Adjust height for the new header (approx 64px)
     const width = window.innerWidth;
-    const height = window.innerHeight;
+    const height = window.innerHeight - 64; 
 
     const render = Render.create({
       element: sceneRef.current,
@@ -45,29 +42,68 @@ export default function Lab() {
       options: { width, height, wireframes: false, background: 'transparent' }
     });
 
+    // Boundaries
     const ground = Bodies.rectangle(width / 2, height + 100, width * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
     const leftWall = Bodies.rectangle(-100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
     const rightWall = Bodies.rectangle(width + 100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
-
     World.add(engine.world, [ground, leftWall, rightWall]);
 
-    if (lesson === 2) {
-      const ramp = Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, {
-        isStatic: true, angle: Math.PI / 8, render: { fillStyle: '#334155' }
-      });
-      World.add(engine.world, [ramp]);
-    }
-
-    if (lesson === 3) {
-      engine.gravity.y = 1;
+    // --- LESSON ENVIRONMENT BUILDER ---
+    const buildEnvironment = () => {
+      engine.gravity.y = 1; // Reset gravity
       setGravityType('Earth');
-    }
+
+      if (lesson === 2) {
+        World.add(engine.world, Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, { isStatic: true, angle: Math.PI / 8, render: { fillStyle: '#334155' } }));
+      }
+      if (lesson === 5) {
+        // Newton's Cradle
+        const cradle = Composites.newtonsCradle(width / 2 - 100, 100, 5, 20, 200);
+        World.add(engine.world, cradle);
+      }
+      if (lesson === 6) {
+        // Wrecking Ball Pyramid
+        const pyramid = Composites.pyramid(width / 2, height - 300, 9, 10, 0, 0, (x, y) => Bodies.rectangle(x, y, 30, 30, { render: { fillStyle: '#d97706' } }));
+        World.add(engine.world, pyramid);
+      }
+      if (lesson === 7) {
+        // Elasticity (Slingshot anchor)
+        const anchor = { x: width / 2, y: 300 };
+        const ball = Bodies.circle(anchor.x, anchor.y + 100, 30, { render: { fillStyle: '#f43f5e' } });
+        const spring = Constraint.create({ pointA: anchor, bodyB: ball, stiffness: 0.05, render: { strokeStyle: '#64748b' } });
+        World.add(engine.world, [ball, spring]);
+      }
+      if (lesson === 8) {
+        // Suspension Bridge
+        const group = Matter.Body.nextGroup(true);
+        const bridge = Composites.stack(width * 0.2, height * 0.4, 10, 1, 0, 0, (x, y) => 
+          Bodies.rectangle(x, y, 50, 20, { collisionFilter: { group: group }, render: { fillStyle: '#64748b' } })
+        );
+        Composites.chain(bridge, 0.5, 0, -0.5, 0, { stiffness: 0.9, length: 2, render: { visible: false } });
+        World.add(engine.world, [
+          bridge,
+          Constraint.create({ pointA: { x: width * 0.2, y: height * 0.4 }, bodyB: bridge.bodies[0], pointB: { x: -25, y: 0 }, stiffness: 0.9 }),
+          Constraint.create({ pointA: { x: width * 0.8, y: height * 0.4 }, bodyB: bridge.bodies[bridge.bodies.length - 1], pointB: { x: 25, y: 0 }, stiffness: 0.9 })
+        ]);
+      }
+      if (lesson === 9) {
+        // Soft Body (Deformable Jello)
+        const softBody = Composites.softBody(width / 2, 100, 5, 5, 0, 0, true, 18, { render: { fillStyle: '#10b981' } });
+        World.add(engine.world, softBody);
+      }
+      if (lesson === 10) {
+        // Funnel for granular flow
+        World.add(engine.world, [
+          Bodies.rectangle(width / 2 - 150, height / 2, 300, 20, { isStatic: true, angle: Math.PI / 6, render: { fillStyle: '#334155' } }),
+          Bodies.rectangle(width / 2 + 150, height / 2, 300, 20, { isStatic: true, angle: -Math.PI / 6, render: { fillStyle: '#334155' } })
+        ]);
+      }
+    };
+
+    buildEnvironment();
 
     const mouse = Mouse.create(render.canvas);
-    const mouseConstraint = MouseConstraint.create(engine, {
-      mouse: mouse,
-      constraint: { stiffness: 0.2, render: { visible: false } }
-    });
+    const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.2, render: { visible: false } } });
     World.add(engine.world, mouseConstraint);
 
     Render.run(render);
@@ -83,253 +119,161 @@ export default function Lab() {
     };
   }, [lesson]); 
 
-  const spawnObject = (type) => {
+  // Object Spawning Engine
+  const spawn = (type) => {
     if (!engineRef.current) return;
     const { Bodies, World } = Matter;
-    const startX = window.innerWidth / 2 + (Math.random() * 50 - 25);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const cx = w / 2 + (Math.random() * 50 - 25);
+    
     let newBody;
 
-    if (lesson === 1) {
-      if (type === 'rubber') newBody = Bodies.circle(startX, 100, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } });
-      else if (type === 'bowling') newBody = Bodies.circle(startX, 100, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } });
+    switch(type) {
+      case 'rubber': newBody = Bodies.circle(cx, 100, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } }); break;
+      case 'bowling': newBody = Bodies.circle(cx, 100, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } }); break;
+      case 'ice': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.001, render: { fillStyle: '#bae6fd' } }); break;
+      case 'wood': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.4, render: { fillStyle: '#d97706' } }); break;
+      case 'feather': newBody = Bodies.circle(w * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
+      case 'iron': newBody = Bodies.circle(w * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
+      case 'wrecking-ball': newBody = Bodies.circle(w * 0.3, h * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
+      case 'heavy-box': newBody = Bodies.rectangle(cx, 50, 60, 60, { density: 0.08, render: { fillStyle: '#9333ea' } }); break;
+      case 'particles': 
+        for(let i=0; i<30; i++) World.add(engineRef.current.world, Bodies.circle(cx + (Math.random()*100-50), 50, 8, { render: { fillStyle: '#eab308' } }));
+        break;
+      case 'custom':
+        const mat = materials[customMaterial];
+        const options = { restitution: mat.restitution, friction: mat.friction, density: mat.density * customMassMult, render: { fillStyle: mat.color } };
+        const startX = lesson === 2 ? w * 0.2 : cx;
+        if (customShape === 'circle') newBody = Bodies.circle(startX, 100, customSize, options);
+        else if (customShape === 'square') newBody = Bodies.rectangle(startX, 100, customSize * 2, customSize * 2, options);
+        else if (customShape === 'triangle') newBody = Bodies.polygon(startX, 100, 3, customSize * 1.2, options);
+        break;
     }
-    
-    if (lesson === 2) {
-      const dropX = window.innerWidth * 0.2;
-      if (type === 'ice') newBody = Bodies.rectangle(dropX, 100, 50, 50, { friction: 0.001, render: { fillStyle: '#bae6fd' } });
-      else if (type === 'wood') newBody = Bodies.rectangle(dropX, 100, 50, 50, { friction: 0.4, render: { fillStyle: '#d97706' } });
-      else if (type === 'rubber-block') newBody = Bodies.rectangle(dropX, 100, 50, 50, { friction: 0.9, render: { fillStyle: '#1e293b' } });
-    }
-
-    if (lesson === 3) {
-      newBody = Bodies.rectangle(startX, 100, 40, 40, { render: { fillStyle: '#a78bfa' } });
-    }
-
-    if (newBody) World.add(engineRef.current.world, newBody);
-  };
-
-  const spawnCustomObject = () => {
-    if (!engineRef.current) return;
-    const { Bodies, World } = Matter;
-    
-    const startX = lesson === 2 ? window.innerWidth * 0.2 : window.innerWidth / 2 + (Math.random() * 50 - 25);
-    const startY = 100;
-    
-    const mat = materials[customMaterial];
-    const options = {
-      restitution: mat.restitution,
-      friction: mat.friction,
-      density: mat.density * customMassMult, // 🚀 NEW: Apply custom mass multiplier
-      render: { fillStyle: mat.color }
-    };
-
-    let newBody;
-    if (customShape === 'circle') {
-      newBody = Bodies.circle(startX, startY, customSize, options);
-    } else if (customShape === 'square') {
-      newBody = Bodies.rectangle(startX, startY, customSize * 2, customSize * 2, options);
-    } else if (customShape === 'triangle') {
-      newBody = Bodies.polygon(startX, startY, 3, customSize * 1.2, options);
-    }
-
     if (newBody) World.add(engineRef.current.world, newBody);
   };
 
   const changeGravity = (type) => {
     if (!engineRef.current) return;
     setGravityType(type);
-    if (type === 'Earth') engineRef.current.gravity.y = 1;
-    if (type === 'Moon') engineRef.current.gravity.y = 0.16;
-    if (type === 'Jupiter') engineRef.current.gravity.y = 2.4;
+    engineRef.current.gravity.y = type === 'Earth' ? 1 : type === 'Moon' ? 0.16 : 2.4;
   };
 
   const clearLab = () => {
     if (!engineRef.current) return;
-    const world = engineRef.current.world;
-    const dynamicBodies = world.bodies.filter(body => !body.isStatic);
-    Matter.World.remove(world, dynamicBodies);
+    const dynamicBodies = engineRef.current.world.bodies.filter(b => !b.isStatic);
+    const composites = engineRef.current.world.composites;
+    const constraints = engineRef.current.world.constraints;
+    Matter.World.remove(engineRef.current.world, [...dynamicBodies, ...composites, ...constraints]);
+    setLesson(lesson); // Hack to trigger a re-render of the specific lesson environment
   };
 
+  // --- UI DATA DRIVEN ARCHITECTURE ---
+  const lessonData = {
+    1: { title: 'Restitution', desc: 'Observe kinetic energy retention (bounciness).', buttons: [{ label: 'Rubber', action: () => spawn('rubber') }, { label: 'Bowling', action: () => spawn('bowling') }] },
+    2: { title: 'Friction', desc: 'Friction resists sliding. Drop blocks on the ramp.', buttons: [{ label: 'Ice', action: () => spawn('ice') }, { label: 'Wood', action: () => spawn('wood') }] },
+    3: { title: 'Gravity', desc: 'Change planetary mass.', isGravity: true },
+    4: { title: 'Air Resistance', desc: 'Drag affects falling speed regardless of mass.', buttons: [{ label: 'Feather', action: () => spawn('feather') }, { label: 'Iron Ball', action: () => spawn('iron') }] },
+    5: { title: 'Momentum', desc: 'Conservation of momentum. Drag the end ball of the Cradle and drop it!', buttons: [] },
+    6: { title: 'Kinetics', desc: 'Transfer massive force into a stable structure.', buttons: [{ label: 'Drop Wrecking Ball', action: () => spawn('wrecking-ball') }] },
+    7: { title: 'Elasticity', desc: 'Springs & Constraints. Drag the ball and release it to slingshot it.', buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }] },
+    8: { title: 'Tension', desc: 'Suspension bridge held by constraints.', buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }] },
+    9: { title: 'Soft Bodies', desc: 'Deformable composite structures.', buttons: [{ label: 'Drop Heavy Box', action: () => spawn('heavy-box') }] },
+    10: { title: 'Granular Flow', desc: 'Thousands of particles acting like fluid.', buttons: [{ label: 'Spawn 30 Particles', action: () => spawn('particles') }] },
+  };
+
+  const currentLesson = lessonData[lesson];
+
   return (
-    <main className="relative min-h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+    <div className="relative h-[calc(100vh-64px)] w-full overflow-hidden">
       
-      {/* Top Navigation Menu */}
-      <div className="absolute top-0 left-0 w-full p-6 z-30 pointer-events-none flex justify-between items-start">
-        
-        {/* Main Controller Panel */}
-        <div className={`bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl pointer-events-auto w-full transition-all duration-300 ease-in-out overflow-hidden ${isMinimized ? 'max-w-xs p-4' : 'max-w-md p-6'}`}>
+      {/* HUD Menu */}
+      <div className="absolute top-6 left-6 z-30 pointer-events-none flex justify-between items-start max-h-[85vh] overflow-y-auto custom-scrollbar">
+        <div className={`bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl pointer-events-auto w-full transition-all duration-300 ease-in-out ${isMinimized ? 'max-w-xs p-4' : 'max-w-sm p-6'}`}>
           
-          {/* Header & Window Controls */}
           <div className={`flex items-center justify-between ${isMinimized ? '' : 'mb-4 pb-4 border-b border-slate-800'}`}>
             <div className="flex items-center gap-2">
-              {!isMinimized && (
-                <button onClick={() => setLesson(Math.max(1, lesson - 1))} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg disabled:opacity-30 transition">
-                  <ChevronLeft className="w-4 h-4"/>
-                </button>
-              )}
-              
+              {!isMinimized && <button onClick={() => setLesson(Math.max(1, lesson - 1))} className="p-2 bg-slate-800 hover:bg-cyan-600 rounded-lg disabled:opacity-30 transition"><ChevronLeft className="w-4 h-4"/></button>}
               <Activity className="text-cyan-400 w-5 h-5"/>
               <h1 className="text-lg font-bold text-white whitespace-nowrap">
-                {isMinimized ? `Lesson ${lesson}` : `Lesson ${lesson}: ${lesson === 1 ? 'Restitution' : lesson === 2 ? 'Friction' : 'Gravity'}`}
+                {isMinimized ? `L${lesson}` : `Lesson ${lesson}: ${currentLesson.title}`}
               </h1>
-
-              {!isMinimized && (
-                <button onClick={() => setLesson(Math.min(3, lesson + 1))} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg disabled:opacity-30 transition">
-                  <ChevronRight className="w-4 h-4"/>
-                </button>
-              )}
+              {!isMinimized && <button onClick={() => setLesson(Math.min(10, lesson + 1))} className="p-2 bg-slate-800 hover:bg-cyan-600 rounded-lg disabled:opacity-30 transition"><ChevronRight className="w-4 h-4"/></button>}
             </div>
-
-            {/* Minimize/Maximize Toggle */}
-            <button 
-              onClick={() => setIsMinimized(!isMinimized)} 
-              className="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700 rounded-lg transition"
-              title={isMinimized ? "Expand Menu" : "Minimize Menu"}
-            >
+            <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded-lg transition">
               {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
             </button>
           </div>
           
-          {/* Menu Content (Hidden when minimized) */}
           {!isMinimized && (
-            <>
-              {/* Standard Lesson Controls */}
-              <div className="mb-6">
-                {lesson === 1 && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <p className="text-slate-400 text-sm">Drop objects to see how different materials retain kinetic energy when they bounce.</p>
-                    <div className="flex gap-2">
-                      <button onClick={() => spawnObject('rubber')} className="px-3 py-2 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm border border-cyan-800 hover:bg-cyan-800 transition">Rubber Ball</button>
-                      <button onClick={() => spawnObject('bowling')} className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm border border-slate-700 hover:bg-slate-700 transition">Bowling Ball</button>
-                    </div>
-                  </div>
-                )}
-                {lesson === 2 && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <p className="text-slate-400 text-sm">Friction resists sliding motion. Drop these blocks on the ramp to test their slip factor.</p>
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={() => spawnObject('ice')} className="px-3 py-2 bg-sky-900/50 text-sky-300 rounded-lg text-sm border border-sky-800 hover:bg-sky-800 transition">Ice</button>
-                      <button onClick={() => spawnObject('wood')} className="px-3 py-2 bg-amber-900/50 text-amber-300 rounded-lg text-sm border border-amber-800 hover:bg-amber-800 transition">Wood</button>
-                      <button onClick={() => spawnObject('rubber-block')} className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm border border-slate-700 hover:bg-slate-700 transition">Rubber</button>
-                    </div>
-                  </div>
-                )}
-                {lesson === 3 && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <p className="text-slate-400 text-sm">Change the planet to see how acceleration changes the fall rate!</p>
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={() => changeGravity('Earth')} className={`px-3 py-2 rounded-lg text-sm border transition ${gravityType === 'Earth' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>Earth (1G)</button>
-                      <button onClick={() => changeGravity('Moon')} className={`px-3 py-2 rounded-lg text-sm border transition ${gravityType === 'Moon' ? 'bg-slate-300 text-slate-900 border-slate-400' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>Moon (0.16G)</button>
-                      <button onClick={() => changeGravity('Jupiter')} className={`px-3 py-2 rounded-lg text-sm border transition ${gravityType === 'Jupiter' ? 'bg-orange-700 text-white border-orange-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>Jupiter (2.4G)</button>
-                    </div>
-                  </div>
+            <div className="animate-in fade-in">
+              <p className="text-slate-400 text-sm mb-4">{currentLesson.desc}</p>
+              
+              <div className="flex flex-wrap gap-2 mb-6">
+                {currentLesson.buttons.map((btn, i) => (
+                  <button key={i} onClick={btn.action} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700 transition">
+                    {btn.label}
+                  </button>
+                ))}
+                
+                {currentLesson.isGravity && (
+                  <>
+                    <button onClick={() => changeGravity('Earth')} className={`px-3 py-2 rounded-lg text-sm border ${gravityType === 'Earth' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Earth</button>
+                    <button onClick={() => changeGravity('Moon')} className={`px-3 py-2 rounded-lg text-sm border ${gravityType === 'Moon' ? 'bg-slate-300 text-slate-900' : 'bg-slate-800 text-slate-400'}`}>Moon</button>
+                    <button onClick={() => changeGravity('Jupiter')} className={`px-3 py-2 rounded-lg text-sm border ${gravityType === 'Jupiter' ? 'bg-orange-700 text-white' : 'bg-slate-800 text-slate-400'}`}>Jupiter</button>
+                  </>
                 )}
               </div>
 
-              {/* Custom Object Forge UI */}
-              <div className="mt-4 pt-4 border-t border-slate-800">
-                <button 
-                  onClick={() => setShowCustomizer(!showCustomizer)}
-                  className="flex items-center gap-2 text-slate-300 hover:text-white text-sm font-medium transition w-full"
-                >
-                  <Settings className="w-4 h-4" /> 
-                  {showCustomizer ? 'Hide Object Forge' : 'Open Object Forge'}
+              {/* Object Forge (Minimized Logic) */}
+              <div className="pt-4 border-t border-slate-800">
+                <button onClick={() => setShowCustomizer(!showCustomizer)} className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 text-sm font-medium transition w-full">
+                  <Settings className="w-4 h-4" /> {showCustomizer ? 'Close Forge' : 'Open Forge'}
                 </button>
-
+                
                 {showCustomizer && (
-                  <div className="mt-4 space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800 animate-in slide-in-from-top-2">
-                    
-                    {/* Shape Selector */}
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wider mb-2 block">Shape</label>
-                      <div className="flex gap-2">
-                        {['circle', 'square', 'triangle'].map(shape => (
-                          <button 
-                            key={shape} 
-                            onClick={() => setCustomShape(shape)}
-                            className={`capitalize flex-1 py-1.5 text-xs rounded-md border transition-colors ${customShape === shape ? 'bg-cyan-900/50 border-cyan-500 text-cyan-300' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
-                          >
-                            {shape}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Material Selector */}
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wider mb-2 block">Material</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {Object.keys(materials).map(matKey => (
-                          <button 
-                            key={matKey} 
-                            onClick={() => setCustomMaterial(matKey)}
-                            className={`flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border transition ${customMaterial === matKey ? 'bg-slate-700 border-slate-500 text-white' : 'bg-slate-800 border-slate-800 text-slate-400'}`}
-                          >
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: materials[matKey].color }}></span>
-                            {materials[matKey].name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Dimensions & Mass Multiplier Grid */}
+                  <div className="mt-4 space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
                     <div className="grid grid-cols-2 gap-4">
-                      {/* Size Slider */}
                       <div>
-                        <label className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
-                          <span>Size</span>
-                          <span className="text-cyan-400">{customSize}px</span>
-                        </label>
-                        <input 
-                          type="range" 
-                          min="15" 
-                          max="80" 
-                          value={customSize} 
-                          onChange={(e) => setCustomSize(Number(e.target.value))}
-                          className="w-full accent-cyan-500"
-                        />
+                        <label className="text-xs text-slate-500 block mb-2">SHAPE</label>
+                        <select onChange={e => setCustomShape(e.target.value)} className="w-full bg-slate-800 text-xs p-2 rounded-md border border-slate-700">
+                          <option value="circle">Circle</option><option value="square">Square</option><option value="triangle">Triangle</option>
+                        </select>
                       </div>
-                      
-                      {/* Mass Multiplier Slider */}
                       <div>
-                        <label className="text-xs text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
-                          <span>Mass</span>
-                          <span className="text-indigo-400">{customMassMult}x</span>
-                        </label>
-                        <input 
-                          type="range" 
-                          min="0.1" 
-                          max="10" 
-                          step="0.1"
-                          value={customMassMult} 
-                          onChange={(e) => setCustomMassMult(Number(e.target.value))}
-                          className="w-full accent-indigo-500"
-                        />
+                        <label className="text-xs text-slate-500 block mb-2">MATERIAL</label>
+                        <select onChange={e => setCustomMaterial(e.target.value)} className="w-full bg-slate-800 text-xs p-2 rounded-md border border-slate-700">
+                          <option value="wood">Wood</option><option value="metal">Metal</option><option value="rubber">Rubber</option><option value="ice">Ice</option>
+                        </select>
                       </div>
                     </div>
-
-                    {/* Spawn Button */}
-                    <button 
-                      onClick={spawnCustomObject}
-                      className="w-full flex justify-center items-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold shadow-lg transition"
-                    >
-                      <Hammer className="w-4 h-4" /> Forge Object
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-slate-500 flex justify-between mb-1"><span>SIZE</span><span>{customSize}px</span></label>
+                        <input type="range" min="15" max="80" value={customSize} onChange={e => setCustomSize(Number(e.target.value))} className="w-full accent-cyan-500"/>
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-500 flex justify-between mb-1"><span>MASS</span><span>{customMassMult}x</span></label>
+                        <input type="range" min="0.1" max="10" step="0.1" value={customMassMult} onChange={e => setCustomMassMult(Number(e.target.value))} className="w-full accent-indigo-500"/>
+                      </div>
+                    </div>
+                    <button onClick={() => spawn('custom')} className="w-full flex justify-center items-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition">
+                      <Hammer className="w-4 h-4" /> Forge
                     </button>
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
 
       <div ref={sceneRef} className="absolute inset-0 z-10" />
 
-      {/* Clear Lab Button */}
-      <button onClick={clearLab} className="absolute bottom-8 right-8 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg transition-all">
-        <RefreshCw className="w-4 h-4"/> Clear Lab
+      <button onClick={clearLab} className="absolute bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
+        <RefreshCw className="w-4 h-4"/> Reset
       </button>
 
-    </main>
+    </div>
   );
 }
