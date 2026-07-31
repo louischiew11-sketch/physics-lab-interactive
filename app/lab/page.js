@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
-import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2 } from 'lucide-react';
+import Link from 'next/link'; // Added for the Home button
+import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home } from 'lucide-react'; // Added Home icon
 
 export default function Lab() {
   const sceneRef = useRef(null);
@@ -32,9 +33,9 @@ export default function Lab() {
     const engine = Engine.create({ positionIterations: 12, velocityIterations: 12 });
     engineRef.current = engine;
 
-    // Adjust height for the new header (approx 64px)
+    // Fixed canvas height since the header is gone now
     const width = window.innerWidth;
-    const height = window.innerHeight - 64; 
+    const height = window.innerHeight; 
 
     const render = Render.create({
       element: sceneRef.current,
@@ -42,39 +43,33 @@ export default function Lab() {
       options: { width, height, wireframes: false, background: 'transparent' }
     });
 
-    // Boundaries
     const ground = Bodies.rectangle(width / 2, height + 100, width * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
     const leftWall = Bodies.rectangle(-100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
     const rightWall = Bodies.rectangle(width + 100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
     World.add(engine.world, [ground, leftWall, rightWall]);
 
-    // --- LESSON ENVIRONMENT BUILDER ---
     const buildEnvironment = () => {
-      engine.gravity.y = 1; // Reset gravity
+      engine.gravity.y = 1; 
       setGravityType('Earth');
 
       if (lesson === 2) {
         World.add(engine.world, Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, { isStatic: true, angle: Math.PI / 8, render: { fillStyle: '#334155' } }));
       }
       if (lesson === 5) {
-        // Newton's Cradle
         const cradle = Composites.newtonsCradle(width / 2 - 100, 100, 5, 20, 200);
         World.add(engine.world, cradle);
       }
       if (lesson === 6) {
-        // Wrecking Ball Pyramid
         const pyramid = Composites.pyramid(width / 2, height - 300, 9, 10, 0, 0, (x, y) => Bodies.rectangle(x, y, 30, 30, { render: { fillStyle: '#d97706' } }));
         World.add(engine.world, pyramid);
       }
       if (lesson === 7) {
-        // Elasticity (Slingshot anchor)
         const anchor = { x: width / 2, y: 300 };
         const ball = Bodies.circle(anchor.x, anchor.y + 100, 30, { render: { fillStyle: '#f43f5e' } });
         const spring = Constraint.create({ pointA: anchor, bodyB: ball, stiffness: 0.05, render: { strokeStyle: '#64748b' } });
         World.add(engine.world, [ball, spring]);
       }
       if (lesson === 8) {
-        // Suspension Bridge
         const group = Matter.Body.nextGroup(true);
         const bridge = Composites.stack(width * 0.2, height * 0.4, 10, 1, 0, 0, (x, y) => 
           Bodies.rectangle(x, y, 50, 20, { collisionFilter: { group: group }, render: { fillStyle: '#64748b' } })
@@ -87,12 +82,10 @@ export default function Lab() {
         ]);
       }
       if (lesson === 9) {
-        // Soft Body (Deformable Jello)
         const softBody = Composites.softBody(width / 2, 100, 5, 5, 0, 0, true, 18, { render: { fillStyle: '#10b981' } });
         World.add(engine.world, softBody);
       }
       if (lesson === 10) {
-        // Funnel for granular flow
         World.add(engine.world, [
           Bodies.rectangle(width / 2 - 150, height / 2, 300, 20, { isStatic: true, angle: Math.PI / 6, render: { fillStyle: '#334155' } }),
           Bodies.rectangle(width / 2 + 150, height / 2, 300, 20, { isStatic: true, angle: -Math.PI / 6, render: { fillStyle: '#334155' } })
@@ -119,7 +112,6 @@ export default function Lab() {
     };
   }, [lesson]); 
 
-  // Object Spawning Engine
   const spawn = (type) => {
     if (!engineRef.current) return;
     const { Bodies, World } = Matter;
@@ -165,10 +157,9 @@ export default function Lab() {
     const composites = engineRef.current.world.composites;
     const constraints = engineRef.current.world.constraints;
     Matter.World.remove(engineRef.current.world, [...dynamicBodies, ...composites, ...constraints]);
-    setLesson(lesson); // Hack to trigger a re-render of the specific lesson environment
+    setLesson(lesson);
   };
 
-  // --- UI DATA DRIVEN ARCHITECTURE ---
   const lessonData = {
     1: { title: 'Restitution', desc: 'Observe kinetic energy retention (bounciness).', buttons: [{ label: 'Rubber', action: () => spawn('rubber') }, { label: 'Bowling', action: () => spawn('bowling') }] },
     2: { title: 'Friction', desc: 'Friction resists sliding. Drop blocks on the ramp.', buttons: [{ label: 'Ice', action: () => spawn('ice') }, { label: 'Wood', action: () => spawn('wood') }] },
@@ -185,7 +176,7 @@ export default function Lab() {
   const currentLesson = lessonData[lesson];
 
   return (
-    <div className="relative h-[calc(100vh-64px)] w-full overflow-hidden">
+    <div className="relative h-screen w-full overflow-hidden">
       
       {/* HUD Menu */}
       <div className="absolute top-6 left-6 z-30 pointer-events-none flex justify-between items-start max-h-[85vh] overflow-y-auto custom-scrollbar">
@@ -193,6 +184,14 @@ export default function Lab() {
           
           <div className={`flex items-center justify-between ${isMinimized ? '' : 'mb-4 pb-4 border-b border-slate-800'}`}>
             <div className="flex items-center gap-2">
+              
+              {/* NEW: Home Button */}
+              {!isMinimized && (
+                <Link href="/" className="p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700 rounded-lg transition mr-1" title="Back to Home">
+                  <Home className="w-4 h-4" />
+                </Link>
+              )}
+
               {!isMinimized && <button onClick={() => setLesson(Math.max(1, lesson - 1))} className="p-2 bg-slate-800 hover:bg-cyan-600 rounded-lg disabled:opacity-30 transition"><ChevronLeft className="w-4 h-4"/></button>}
               <Activity className="text-cyan-400 w-5 h-5"/>
               <h1 className="text-lg font-bold text-white whitespace-nowrap">
@@ -210,7 +209,9 @@ export default function Lab() {
               <p className="text-slate-400 text-sm mb-4">{currentLesson.desc}</p>
               
               <div className="flex flex-wrap gap-2 mb-6">
-                {currentLesson.buttons.map((btn, i) => (
+                
+                {/* BUG FIX: Added ?. before map to prevent crashing if buttons array is missing */}
+                {currentLesson.buttons?.map((btn, i) => (
                   <button key={i} onClick={btn.action} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm border border-slate-700 transition">
                     {btn.label}
                   </button>
@@ -225,7 +226,6 @@ export default function Lab() {
                 )}
               </div>
 
-              {/* Object Forge (Minimized Logic) */}
               <div className="pt-4 border-t border-slate-800">
                 <button onClick={() => setShowCustomizer(!showCustomizer)} className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 text-sm font-medium transition w-full">
                   <Settings className="w-4 h-4" /> {showCustomizer ? 'Close Forge' : 'Open Forge'}
