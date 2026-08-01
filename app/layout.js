@@ -2,7 +2,7 @@ import './globals.css';
 import NavigationWrapper from './NavigationWrapper';
 
 export const metadata = {
-  title: 'Physics Lab | Interactive Learning',
+  title: 'PhysicsLab | Interactive Learning',
   description: 'An interactive physics sandbox built with Matter.js and Next.js',
 };
 
