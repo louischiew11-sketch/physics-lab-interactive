@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home, Lightbulb, CheckCircle2, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
 
 const WORLD_W = 1200;
-const WORLD_H = 800;
+const WORLD_H = 400;
 
 export default function Lab() {
   const sceneRef = useRef(null);
@@ -88,7 +88,7 @@ export default function Lab() {
     return () => window.removeEventListener('resize', handleResize);
   }, [applyCameraView]);
 
-  // 🚀 MOUSE WHEEL SCROLL ZOOM
+  //  MOUSE WHEEL SCROLL ZOOM
   useEffect(() => {
     const handleWheel = (e) => {
       // Only zoom if the mouse is hovering over the physics canvas
