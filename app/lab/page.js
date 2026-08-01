@@ -72,7 +72,7 @@ export default function Lab() {
     render.bounds.max.x = render.bounds.min.x + visibleW;
 
     // Anchor Y to the ground (Ground is at Y = 900)
-    render.bounds.max.y = WORLD_H + 150; 
+    render.bounds.max.y = WORLD_H + 50; 
     render.bounds.min.y = render.bounds.max.y - visibleH;
 
     // Scale the mouse controller so interactions match the zoomed camera!
