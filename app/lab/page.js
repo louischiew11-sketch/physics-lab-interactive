@@ -6,13 +6,13 @@ import Link from 'next/link';
 import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home, Lightbulb, CheckCircle2, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
 
 const WORLD_W = 1200;
-const WORLD_H = 400;
 
 export default function Lab() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
   const renderRef = useRef(null);
   const mouseRef = useRef(null);
+  const worldHeightRef = useRef(800); // We will calculate this dynamically!
   
   const [isMinimized, setIsMinimized] = useState(false);
   const [lesson, setLesson] = useState(1);
@@ -30,7 +30,6 @@ export default function Lab() {
   const [quizState, setQuizState] = useState('idle');
   const [selectedAnswer, setSelectedAnswer] = useState(null);
 
-  // Auto-minimize menu on mobile
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) setIsMinimized(true);
   }, []);
@@ -48,39 +47,38 @@ export default function Lab() {
     ice: { restitution: 0.2, friction: 0.001, density: 0.02, color: '#bae6fd', name: 'Ice' }
   };
 
-  // 🚀 THE RESPONSIVE CAMERA LOGIC
+  // 🚀 The Magic Camera Function
   const applyCameraView = useCallback(() => {
     if (!renderRef.current || !mouseRef.current) return;
     const render = renderRef.current;
     const mouse = mouseRef.current;
     
-    // Update actual canvas HTML dimensions to fill screen
+    // Canvas always matches actual window physical size
     render.canvas.width = window.innerWidth;
     render.canvas.height = window.innerHeight;
     render.options.width = window.innerWidth;
     render.options.height = window.innerHeight;
 
-    // Base scale forces the 1200px logical world width to perfectly fit the device screen width
+    // We scale the view so that exactly 1200 logical pixels fit horizontally across your screen
     const baseScale = window.innerWidth / WORLD_W;
     const finalScale = baseScale * zoom;
 
     const visibleW = window.innerWidth / finalScale;
     const visibleH = window.innerHeight / finalScale;
 
-    // Center X to perfectly hide the left/right walls at zoom = 1
+    // Center the camera exactly in the middle of our dynamic logical world!
     render.bounds.min.x = (WORLD_W - visibleW) / 2;
     render.bounds.max.x = render.bounds.min.x + visibleW;
 
-    // Anchor Y to the ground (Ground is at Y = 900)
-    render.bounds.max.y = WORLD_H + 50; 
-    render.bounds.min.y = render.bounds.max.y - visibleH;
+    render.bounds.min.y = (worldHeightRef.current - visibleH) / 2;
+    render.bounds.max.y = render.bounds.min.y + visibleH;
 
-    // Scale the mouse controller so interactions match the zoomed camera!
+    // Sync mouse interactions to match the zoomed camera
     Matter.Mouse.setScale(mouse, { x: 1 / finalScale, y: 1 / finalScale });
     Matter.Mouse.setOffset(mouse, render.bounds.min);
   }, [zoom]);
 
-  // Apply camera automatically when zoom changes or window resizes
+  // Apply camera when zooming or resizing
   useEffect(() => {
     applyCameraView();
     const handleResize = () => applyCameraView();
@@ -88,29 +86,32 @@ export default function Lab() {
     return () => window.removeEventListener('resize', handleResize);
   }, [applyCameraView]);
 
-  //  MOUSE WHEEL SCROLL ZOOM
+  // 🚀 Mouse Wheel Scrolling to Zoom
   useEffect(() => {
     const handleWheel = (e) => {
-      // Only zoom if the mouse is hovering over the physics canvas
+      // Only zoom if hovering over the canvas
       if (e.target.tagName !== 'CANVAS') return;
       e.preventDefault(); 
-      
-      // Calculate smooth zoom
       setZoom(prevZoom => {
+        // Smoothly adjust zoom based on scroll wheel
         const newZoom = prevZoom - e.deltaY * 0.0015;
-        return Math.max(0.4, Math.min(newZoom, 3)); // Clamp zoom between 40% and 300%
+        return Math.max(0.4, Math.min(newZoom, 3)); // Clamp between 40% and 300%
       });
     };
-
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
   }, []);
 
-  // Engine Setup
+  // Main Engine Build
   useEffect(() => {
     const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint, Composites, Constraint } = Matter;
     const engine = Engine.create({ positionIterations: 16, velocityIterations: 16, enableSleeping: false });
     engineRef.current = engine;
+
+    // Calculate a dynamic logical height that perfectly matches the aspect ratio of the user's screen
+    const baseScale = window.innerWidth / WORLD_W;
+    const WORLD_H = window.innerHeight / baseScale;
+    worldHeightRef.current = WORLD_H;
 
     const render = Render.create({
       element: sceneRef.current,
@@ -120,12 +121,12 @@ export default function Lab() {
         height: window.innerHeight, 
         wireframes: false, 
         background: 'transparent',
-        hasBounds: true // Required to allow camera zooming and panning
+        hasBounds: true // Required for camera zooming
       }
     });
     renderRef.current = render;
 
-    // Physical bounds set to logical WORLD_W (1200) and WORLD_H (800)
+    // The walls and ground perfectly bound the screen, leaving no gaps!
     const ground = Bodies.rectangle(WORLD_W / 2, WORLD_H + 100, WORLD_W * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
     const leftWall = Bodies.rectangle(-100, WORLD_H / 2, 200, WORLD_H * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
     const rightWall = Bodies.rectangle(WORLD_W + 100, WORLD_H / 2, 200, WORLD_H * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
@@ -136,7 +137,6 @@ export default function Lab() {
       setGravityType('Earth');
 
       if (lesson === 2) {
-        // Friction bug permanently fixed! Added chamfer: { radius: 10 } to the slope
         World.add(engine.world, Bodies.rectangle(WORLD_W / 2, WORLD_H / 2 + 100, WORLD_W * 0.8, 40, { 
           isStatic: true, angle: Math.PI / 8, friction: 0.1, chamfer: { radius: 10 }, render: { fillStyle: '#334155' } 
         }));
@@ -188,7 +188,7 @@ export default function Lab() {
     const runner = Runner.create();
     Runner.run(runner, engine);
 
-    // Apply camera immediately on load
+    // Apply the camera immediately to fit the boundaries perfectly
     applyCameraView();
 
     return () => {
@@ -200,24 +200,25 @@ export default function Lab() {
     };
   }, [lesson, resetTrigger, applyCameraView]); 
 
+  // Make sure spawning matches our new perfectly scaled logical coordinate system!
   const spawn = (type) => {
     if (!engineRef.current) return;
     const { Bodies, World } = Matter;
-    const cx = WORLD_W / 2 + (Math.random() * 50 - 25);
+    const w = WORLD_W;
+    const h = worldHeightRef.current; // Grab the dynamically calculated height
+    const cx = w / 2 + (Math.random() * 50 - 25);
     let newBody;
 
     switch(type) {
       case 'rubber': newBody = Bodies.circle(cx, 100, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } }); break;
       case 'bowling': newBody = Bodies.circle(cx, 100, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } }); break;
-      
-      // Ice block bug permanently fixed! Free spinning + 0 static friction + 4px chamfer!
       case 'ice': 
-        newBody = Bodies.rectangle(WORLD_W * 0.2, 100, 50, 50, { friction: 0, frictionStatic: 0, chamfer: { radius: 4 }, render: { fillStyle: '#bae6fd' } }); break;
+        newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0, frictionStatic: 0, chamfer: { radius: 4 }, render: { fillStyle: '#bae6fd' } }); break;
       case 'wood': 
-        newBody = Bodies.rectangle(WORLD_W * 0.2, 100, 50, 50, { friction: 0.5, frictionStatic: 0.8, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
-      case 'feather': newBody = Bodies.circle(WORLD_W * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
-      case 'iron': newBody = Bodies.circle(WORLD_W * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
-      case 'wrecking-ball': newBody = Bodies.circle(WORLD_W * 0.3, WORLD_H * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
+        newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.5, frictionStatic: 0.8, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
+      case 'feather': newBody = Bodies.circle(w * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
+      case 'iron': newBody = Bodies.circle(w * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
+      case 'wrecking-ball': newBody = Bodies.circle(w * 0.3, h * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
       case 'heavy-box': newBody = Bodies.rectangle(cx, 50, 60, 60, { density: 0.1, frictionAir: 0.01, chamfer: { radius: 4 }, render: { fillStyle: '#9333ea' } }); break;
       case 'particles': 
         for(let i=0; i<30; i++) World.add(engineRef.current.world, Bodies.circle(cx + (Math.random()*100-50), 50, 8, { render: { fillStyle: '#eab308' } }));
@@ -225,7 +226,7 @@ export default function Lab() {
       case 'custom':
         const mat = materials[customMaterial];
         const options = { restitution: mat.restitution, friction: mat.friction, density: mat.density * customMassMult, render: { fillStyle: mat.color } };
-        const startX = lesson === 2 ? WORLD_W * 0.2 : cx;
+        const startX = lesson === 2 ? w * 0.2 : cx;
         if (customShape === 'circle') newBody = Bodies.circle(startX, 100, customSize, options);
         else if (customShape === 'square') newBody = Bodies.rectangle(startX, 100, customSize * 2, customSize * 2, { ...options, chamfer: { radius: 4 } });
         else if (customShape === 'triangle') newBody = Bodies.polygon(startX, 100, 3, customSize * 1.2, options);
@@ -399,10 +400,9 @@ export default function Lab() {
         </div>
       </div>
 
-      {/* The actual physics canvas */}
       <div ref={sceneRef} className="absolute inset-0 z-10 touch-none" />
 
-      {/* UI Controls (Zoom + Reset) */}
+      {/* Zoom and Reset Controls! */}
       <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex flex-col sm:flex-row items-end sm:items-center gap-3">
         <div className="flex bg-slate-900/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-800 overflow-hidden pointer-events-auto">
           <button onClick={() => setZoom(z => Math.max(z - 0.2, 0.4))} className="px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-800 transition border-r border-slate-700">
