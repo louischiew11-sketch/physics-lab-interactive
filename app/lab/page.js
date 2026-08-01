@@ -1,24 +1,20 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
 import Link from 'next/link';
-import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home, Lightbulb, CheckCircle2, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
-
-const WORLD_W = 1200;
+import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function Lab() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
   const renderRef = useRef(null);
   const mouseRef = useRef(null);
-  const worldHeightRef = useRef(800); // We will calculate this dynamically!
   
   const [isMinimized, setIsMinimized] = useState(false);
   const [lesson, setLesson] = useState(1);
   const [gravityType, setGravityType] = useState('Earth');
   const [resetTrigger, setResetTrigger] = useState(0);
-  const [zoom, setZoom] = useState(1);
 
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [customShape, setCustomShape] = useState('circle');
@@ -31,7 +27,9 @@ export default function Lab() {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) setIsMinimized(true);
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsMinimized(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -47,89 +45,32 @@ export default function Lab() {
     ice: { restitution: 0.2, friction: 0.001, density: 0.02, color: '#bae6fd', name: 'Ice' }
   };
 
-  // 🚀 The Magic Camera Function
-  const applyCameraView = useCallback(() => {
-    if (!renderRef.current || !mouseRef.current) return;
-    const render = renderRef.current;
-    const mouse = mouseRef.current;
-    
-    // Canvas always matches actual window physical size
-    render.canvas.width = window.innerWidth;
-    render.canvas.height = window.innerHeight;
-    render.options.width = window.innerWidth;
-    render.options.height = window.innerHeight;
-
-    // We scale the view so that exactly 1200 logical pixels fit horizontally across your screen
-    const baseScale = window.innerWidth / WORLD_W;
-    const finalScale = baseScale * zoom;
-
-    const visibleW = window.innerWidth / finalScale;
-    const visibleH = window.innerHeight / finalScale;
-
-    // Center the camera exactly in the middle of our dynamic logical world!
-    render.bounds.min.x = (WORLD_W - visibleW) / 2;
-    render.bounds.max.x = render.bounds.min.x + visibleW;
-
-    render.bounds.min.y = (worldHeightRef.current - visibleH) / 2;
-    render.bounds.max.y = render.bounds.min.y + visibleH;
-
-    // Sync mouse interactions to match the zoomed camera
-    Matter.Mouse.setScale(mouse, { x: 1 / finalScale, y: 1 / finalScale });
-    Matter.Mouse.setOffset(mouse, render.bounds.min);
-  }, [zoom]);
-
-  // Apply camera when zooming or resizing
-  useEffect(() => {
-    applyCameraView();
-    const handleResize = () => applyCameraView();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [applyCameraView]);
-
-  // 🚀 Mouse Wheel Scrolling to Zoom
-  useEffect(() => {
-    const handleWheel = (e) => {
-      // Only zoom if hovering over the canvas
-      if (e.target.tagName !== 'CANVAS') return;
-      e.preventDefault(); 
-      setZoom(prevZoom => {
-        // Smoothly adjust zoom based on scroll wheel
-        const newZoom = prevZoom - e.deltaY * 0.0015;
-        return Math.max(0.4, Math.min(newZoom, 3)); // Clamp between 40% and 300%
-      });
-    };
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  // Main Engine Build
   useEffect(() => {
     const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint, Composites, Constraint } = Matter;
+    
     const engine = Engine.create({ positionIterations: 16, velocityIterations: 16, enableSleeping: false });
     engineRef.current = engine;
 
-    // Calculate a dynamic logical height that perfectly matches the aspect ratio of the user's screen
-    const baseScale = window.innerWidth / WORLD_W;
-    const WORLD_H = window.innerHeight / baseScale;
-    worldHeightRef.current = WORLD_H;
+    // 🚀 We are back to your original, perfect screen layout size!
+    const width = window.innerWidth;
+    const height = window.innerHeight; 
 
     const render = Render.create({
       element: sceneRef.current,
       engine: engine,
       options: { 
-        width: window.innerWidth, 
-        height: window.innerHeight, 
+        width, 
+        height, 
         wireframes: false, 
         background: 'transparent',
-        hasBounds: true // Required for camera zooming
+        hasBounds: true // 🚀 This allows the camera view to be moved!
       }
     });
     renderRef.current = render;
 
-    // The walls and ground perfectly bound the screen, leaving no gaps!
-    const ground = Bodies.rectangle(WORLD_W / 2, WORLD_H + 100, WORLD_W * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
-    const leftWall = Bodies.rectangle(-100, WORLD_H / 2, 200, WORLD_H * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
-    const rightWall = Bodies.rectangle(WORLD_W + 100, WORLD_H / 2, 200, WORLD_H * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
+    const ground = Bodies.rectangle(width / 2, height + 100, width * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
+    const leftWall = Bodies.rectangle(-100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
+    const rightWall = Bodies.rectangle(width + 100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
     World.add(engine.world, [ground, leftWall, rightWall]);
 
     const buildEnvironment = () => {
@@ -137,42 +78,42 @@ export default function Lab() {
       setGravityType('Earth');
 
       if (lesson === 2) {
-        World.add(engine.world, Bodies.rectangle(WORLD_W / 2, WORLD_H / 2 + 100, WORLD_W * 0.8, 40, { 
+        World.add(engine.world, Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, { 
           isStatic: true, angle: Math.PI / 8, friction: 0.1, chamfer: { radius: 10 }, render: { fillStyle: '#334155' } 
         }));
       }
       if (lesson === 5) {
-        const cradle = Composites.newtonsCradle(WORLD_W / 2 - 100, 100, 5, 20, 200);
+        const cradle = Composites.newtonsCradle(width / 2 - 100, 100, 5, 20, 200);
         World.add(engine.world, cradle);
       }
       if (lesson === 6) {
-        const pyramid = Composites.pyramid(WORLD_W / 2, WORLD_H - 300, 9, 10, 0, 0, (x, y) => Bodies.rectangle(x, y, 30, 30, { render: { fillStyle: '#d97706' } }));
+        const pyramid = Composites.pyramid(width / 2, height - 300, 9, 10, 0, 0, (x, y) => Bodies.rectangle(x, y, 30, 30, { render: { fillStyle: '#d97706' } }));
         World.add(engine.world, pyramid);
       }
       if (lesson === 7) {
-        const anchor = { x: WORLD_W / 2, y: 300 };
+        const anchor = { x: width / 2, y: 300 };
         const ball = Bodies.circle(anchor.x, anchor.y + 100, 30, { render: { fillStyle: '#f43f5e' } });
         const spring = Constraint.create({ pointA: anchor, bodyB: ball, stiffness: 0.05, render: { strokeStyle: '#64748b' } });
         World.add(engine.world, [ball, spring]);
       }
       if (lesson === 8) {
         const group = Matter.Body.nextGroup(true);
-        const bridge = Composites.stack(WORLD_W * 0.2, WORLD_H * 0.4, 10, 1, 0, 0, (x, y) => Bodies.rectangle(x, y, 50, 25, { collisionFilter: { group: group }, density: 0.05, render: { fillStyle: '#64748b' } }));
+        const bridge = Composites.stack(width * 0.2, height * 0.4, 10, 1, 0, 0, (x, y) => Bodies.rectangle(x, y, 50, 25, { collisionFilter: { group: group }, density: 0.05, render: { fillStyle: '#64748b' } }));
         Composites.chain(bridge, 0.5, 0, -0.5, 0, { stiffness: 0.9, length: 2, render: { visible: false } });
         World.add(engine.world, [
           bridge,
-          Constraint.create({ pointA: { x: WORLD_W * 0.2, y: WORLD_H * 0.4 }, bodyB: bridge.bodies[0], pointB: { x: -25, y: 0 }, stiffness: 0.9 }),
-          Constraint.create({ pointA: { x: WORLD_W * 0.8, y: WORLD_H * 0.4 }, bodyB: bridge.bodies[bridge.bodies.length - 1], pointB: { x: 25, y: 0 }, stiffness: 0.9 })
+          Constraint.create({ pointA: { x: width * 0.2, y: height * 0.4 }, bodyB: bridge.bodies[0], pointB: { x: -25, y: 0 }, stiffness: 0.9 }),
+          Constraint.create({ pointA: { x: width * 0.8, y: height * 0.4 }, bodyB: bridge.bodies[bridge.bodies.length - 1], pointB: { x: 25, y: 0 }, stiffness: 0.9 })
         ]);
       }
       if (lesson === 9) {
-        const softBody = Composites.softBody(WORLD_W / 2, 100, 5, 5, 2, 2, true, 16, { restitution: 0.5, friction: 0.05, render: { fillStyle: '#10b981' } });
+        const softBody = Composites.softBody(width / 2, 100, 5, 5, 2, 2, true, 16, { restitution: 0.5, friction: 0.05, render: { fillStyle: '#10b981' } });
         World.add(engine.world, softBody);
       }
       if (lesson === 10) {
         World.add(engine.world, [
-          Bodies.rectangle(WORLD_W / 2 - 150, WORLD_H / 2 + 100, 300, 20, { isStatic: true, angle: Math.PI / 6, chamfer: { radius: 10 }, render: { fillStyle: '#334155' } }),
-          Bodies.rectangle(WORLD_W / 2 + 150, WORLD_H / 2 + 100, 300, 20, { isStatic: true, angle: -Math.PI / 6, chamfer: { radius: 10 }, render: { fillStyle: '#334155' } })
+          Bodies.rectangle(width / 2 - 150, height / 2 + 100, 300, 20, { isStatic: true, angle: Math.PI / 6, chamfer: { radius: 10 }, render: { fillStyle: '#334155' } }),
+          Bodies.rectangle(width / 2 + 150, height / 2 + 100, 300, 20, { isStatic: true, angle: -Math.PI / 6, chamfer: { radius: 10 }, render: { fillStyle: '#334155' } })
         ]);
       }
     };
@@ -188,48 +129,105 @@ export default function Lab() {
     const runner = Runner.create();
     Runner.run(runner, engine);
 
-    // Apply the camera immediately to fit the boundaries perfectly
-    applyCameraView();
+    // 🚀 NEW FEATURE: DRAG TO PAN CAMERA
+    let isPanning = false;
+    let startX = 0;
+    let startY = 0;
+
+    const handlePointerDown = (e) => {
+      if (e.target.tagName !== 'CANVAS') return;
+      // If we didn't click on a physics body, start dragging the camera!
+      if (!mouseConstraint.body) {
+        isPanning = true;
+        startX = e.clientX || e.touches[0].clientX;
+        startY = e.clientY || e.touches[0].clientY;
+        render.canvas.style.cursor = 'grabbing';
+      }
+    };
+
+    const handlePointerMove = (e) => {
+      if (isPanning) {
+        const currentX = e.clientX || e.touches[0].clientX;
+        const currentY = e.clientY || e.touches[0].clientY;
+        
+        const deltaX = startX - currentX;
+        const deltaY = startY - currentY;
+
+        // Move the camera bounds
+        render.bounds.min.x += deltaX;
+        render.bounds.max.x += deltaX;
+        render.bounds.min.y += deltaY;
+        render.bounds.max.y += deltaY;
+
+        // Keep mouse interactions synced with the moved camera
+        Matter.Mouse.setOffset(mouse, render.bounds.min);
+
+        startX = currentX;
+        startY = currentY;
+      }
+    };
+
+    const handlePointerUp = () => {
+      isPanning = false;
+      if (render.canvas) render.canvas.style.cursor = 'default';
+    };
+
+    render.canvas.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    
+    render.canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
 
     return () => {
+      render.canvas.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      render.canvas.removeEventListener('touchstart', handlePointerDown);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+      
       Render.stop(render);
       Runner.stop(runner);
       World.clear(engine.world);
       Engine.clear(engine);
       if (render.canvas) render.canvas.remove();
     };
-  }, [lesson, resetTrigger, applyCameraView]); 
+  }, [lesson, resetTrigger]); 
 
-  // Make sure spawning matches our new perfectly scaled logical coordinate system!
   const spawn = (type) => {
-    if (!engineRef.current) return;
+    if (!engineRef.current || !renderRef.current) return;
     const { Bodies, World } = Matter;
-    const w = WORLD_W;
-    const h = worldHeightRef.current; // Grab the dynamically calculated height
-    const cx = w / 2 + (Math.random() * 50 - 25);
+    
+    // 🚀 FIX: Drop items right in the center of wherever the camera is currently looking!
+    const bounds = renderRef.current.bounds;
+    const cx = bounds.min.x + (bounds.max.x - bounds.min.x) / 2 + (Math.random() * 50 - 25);
+    const startY = bounds.min.y + 100;
+
     let newBody;
 
     switch(type) {
-      case 'rubber': newBody = Bodies.circle(cx, 100, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } }); break;
-      case 'bowling': newBody = Bodies.circle(cx, 100, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } }); break;
+      case 'rubber': newBody = Bodies.circle(cx, startY, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } }); break;
+      case 'bowling': newBody = Bodies.circle(cx, startY, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } }); break;
       case 'ice': 
-        newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0, frictionStatic: 0, chamfer: { radius: 4 }, render: { fillStyle: '#bae6fd' } }); break;
+        newBody = Bodies.rectangle(bounds.min.x + (bounds.max.x - bounds.min.x) * 0.2, startY, 50, 50, { friction: 0, frictionStatic: 0, chamfer: { radius: 4 }, render: { fillStyle: '#bae6fd' } }); break;
       case 'wood': 
-        newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.5, frictionStatic: 0.8, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
-      case 'feather': newBody = Bodies.circle(w * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
-      case 'iron': newBody = Bodies.circle(w * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
-      case 'wrecking-ball': newBody = Bodies.circle(w * 0.3, h * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
-      case 'heavy-box': newBody = Bodies.rectangle(cx, 50, 60, 60, { density: 0.1, frictionAir: 0.01, chamfer: { radius: 4 }, render: { fillStyle: '#9333ea' } }); break;
+        newBody = Bodies.rectangle(bounds.min.x + (bounds.max.x - bounds.min.x) * 0.2, startY, 50, 50, { friction: 0.5, frictionStatic: 0.8, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
+      case 'feather': newBody = Bodies.circle(cx, startY, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
+      case 'iron': newBody = Bodies.circle(cx, startY, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
+      case 'wrecking-ball': newBody = Bodies.circle(bounds.min.x + (bounds.max.x - bounds.min.x) * 0.3, bounds.min.y + (bounds.max.y - bounds.min.y) * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
+      case 'heavy-box': newBody = Bodies.rectangle(cx, startY, 60, 60, { density: 0.1, frictionAir: 0.01, chamfer: { radius: 4 }, render: { fillStyle: '#9333ea' } }); break;
       case 'particles': 
-        for(let i=0; i<30; i++) World.add(engineRef.current.world, Bodies.circle(cx + (Math.random()*100-50), 50, 8, { render: { fillStyle: '#eab308' } }));
+        for(let i=0; i<30; i++) World.add(engineRef.current.world, Bodies.circle(cx + (Math.random()*100-50), startY, 8, { render: { fillStyle: '#eab308' } }));
         break;
       case 'custom':
         const mat = materials[customMaterial];
         const options = { restitution: mat.restitution, friction: mat.friction, density: mat.density * customMassMult, render: { fillStyle: mat.color } };
-        const startX = lesson === 2 ? w * 0.2 : cx;
-        if (customShape === 'circle') newBody = Bodies.circle(startX, 100, customSize, options);
-        else if (customShape === 'square') newBody = Bodies.rectangle(startX, 100, customSize * 2, customSize * 2, { ...options, chamfer: { radius: 4 } });
-        else if (customShape === 'triangle') newBody = Bodies.polygon(startX, 100, 3, customSize * 1.2, options);
+        const customX = lesson === 2 ? bounds.min.x + (bounds.max.x - bounds.min.x) * 0.2 : cx;
+        if (customShape === 'circle') newBody = Bodies.circle(customX, startY, customSize, options);
+        else if (customShape === 'square') newBody = Bodies.rectangle(customX, startY, customSize * 2, customSize * 2, { ...options, chamfer: { radius: 4 } });
+        else if (customShape === 'triangle') newBody = Bodies.polygon(customX, startY, 3, customSize * 1.2, options);
         break;
     }
     if (newBody) World.add(engineRef.current.world, newBody);
@@ -400,26 +398,12 @@ export default function Lab() {
         </div>
       </div>
 
+      {/* Physics Canvas */}
       <div ref={sceneRef} className="absolute inset-0 z-10 touch-none" />
 
-      {/* Zoom and Reset Controls! */}
-      <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex flex-col sm:flex-row items-end sm:items-center gap-3">
-        <div className="flex bg-slate-900/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-800 overflow-hidden pointer-events-auto">
-          <button onClick={() => setZoom(z => Math.max(z - 0.2, 0.4))} className="px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-800 transition border-r border-slate-700">
-            <ZoomOut className="w-5 h-5" />
-          </button>
-          <div className="px-3 flex items-center justify-center text-xs font-bold text-slate-400 min-w-[3rem]">
-            {Math.round(zoom * 100)}%
-          </div>
-          <button onClick={() => setZoom(z => Math.min(z + 0.2, 3))} className="px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-800 transition border-l border-slate-700">
-            <ZoomIn className="w-5 h-5" />
-          </button>
-        </div>
-        
-        <button onClick={clearLab} className="flex pointer-events-auto items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
-          <RefreshCw className="w-5 h-5"/> <span className="hidden sm:inline font-semibold">Reset</span>
-        </button>
-      </div>
+      <button onClick={clearLab} className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
+        <RefreshCw className="w-5 h-5"/> <span className="hidden sm:inline font-semibold">Reset</span>
+      </button>
 
     </div>
   );
