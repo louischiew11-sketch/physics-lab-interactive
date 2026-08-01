@@ -3,16 +3,23 @@
 import { useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
 import Link from 'next/link';
-import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home, Lightbulb, CheckCircle2, XCircle } from 'lucide-react';
+import { RefreshCw, Activity, ChevronRight, ChevronLeft, Settings, Hammer, Minimize2, Maximize2, Home, Lightbulb, CheckCircle2, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
+
+// Define a fixed logical world size so the physics behaves exactly the same on all devices
+const WORLD_W = 1200;
+const WORLD_H = 800;
 
 export default function Lab() {
   const sceneRef = useRef(null);
   const engineRef = useRef(null);
+  const renderRef = useRef(null);
+  const mouseRef = useRef(null);
   
   const [isMinimized, setIsMinimized] = useState(false);
   const [lesson, setLesson] = useState(1);
   const [gravityType, setGravityType] = useState('Earth');
   const [resetTrigger, setResetTrigger] = useState(0);
+  const [zoom, setZoom] = useState(1); // 🚀 NEW: Camera zoom state
 
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [customShape, setCustomShape] = useState('circle');
@@ -23,6 +30,10 @@ export default function Lab() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizState, setQuizState] = useState('idle');
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setIsMinimized(true);
+  }, []);
 
   useEffect(() => {
     setShowQuiz(false);
@@ -37,23 +48,63 @@ export default function Lab() {
     ice: { restitution: 0.2, friction: 0.001, density: 0.02, color: '#bae6fd', name: 'Ice' }
   };
 
+  // 🚀 FIX: Camera viewport updating function to scale the logical world into the screen
+  const applyCameraView = () => {
+    if (!renderRef.current || !mouseRef.current) return;
+    const render = renderRef.current;
+    const mouse = mouseRef.current;
+    
+    render.canvas.width = window.innerWidth;
+    render.canvas.height = window.innerHeight;
+    render.options.width = window.innerWidth;
+    render.options.height = window.innerHeight;
+
+    const scaleX = window.innerWidth / WORLD_W;
+    const scaleY = window.innerHeight / WORLD_H;
+    
+    // Scale down if on mobile so the whole logical world fits. Multiplied by zoom state!
+    const baseScale = Math.min(scaleX, scaleY) * 0.95; 
+    const finalScale = baseScale * zoom;
+
+    const visibleW = window.innerWidth / finalScale;
+    const visibleH = window.innerHeight / finalScale;
+
+    // Center the camera on the logical world
+    render.bounds.min.x = (WORLD_W - visibleW) / 2;
+    render.bounds.max.x = render.bounds.min.x + visibleW;
+    render.bounds.min.y = (WORLD_H - visibleH) / 2;
+    render.bounds.max.y = render.bounds.min.y + visibleH;
+
+    // IMPORTANT: Sync the mouse constraints with the new scaled viewport!
+    Matter.Mouse.setScale(mouse, { x: 1 / finalScale, y: 1 / finalScale });
+    Matter.Mouse.setOffset(mouse, render.bounds.min);
+  };
+
+  // Main Physics Engine Setup
   useEffect(() => {
     const { Engine, Render, Runner, Bodies, World, Mouse, MouseConstraint, Composites, Constraint } = Matter;
-    const engine = Engine.create({ positionIterations: 16, velocityIterations: 16 });
+    
+    // Position iterations increased, and sleeping disabled to stop balls from randomly stopping
+    const engine = Engine.create({ positionIterations: 16, velocityIterations: 16, enableSleeping: false });
     engineRef.current = engine;
-
-    const width = window.innerWidth;
-    const height = window.innerHeight; 
 
     const render = Render.create({
       element: sceneRef.current,
       engine: engine,
-      options: { width, height, wireframes: false, background: 'transparent' }
+      options: { 
+        width: window.innerWidth, 
+        height: window.innerHeight, 
+        wireframes: false, 
+        background: 'transparent',
+        hasBounds: true // 🚀 Required to enable zooming and panning!
+      }
     });
+    renderRef.current = render;
 
-    const ground = Bodies.rectangle(width / 2, height + 100, width * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
-    const leftWall = Bodies.rectangle(-100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
-    const rightWall = Bodies.rectangle(width + 100, height / 2, 200, height * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
+    // Use logical bounds (WORLD_W, WORLD_H) for environment boundaries instead of device screen
+    const ground = Bodies.rectangle(WORLD_W / 2, WORLD_H + 100, WORLD_W * 3, 250, { isStatic: true, render: { fillStyle: '#1e293b' } });
+    const leftWall = Bodies.rectangle(-100, WORLD_H / 2, 200, WORLD_H * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
+    const rightWall = Bodies.rectangle(WORLD_W + 100, WORLD_H / 2, 200, WORLD_H * 3, { isStatic: true, render: { fillStyle: '#1e293b' } });
     World.add(engine.world, [ground, leftWall, rightWall]);
 
     const buildEnvironment = () => {
@@ -61,40 +112,43 @@ export default function Lab() {
       setGravityType('Earth');
 
       if (lesson === 2) {
-        World.add(engine.world, Bodies.rectangle(width / 2, height / 2 + 100, width * 0.8, 40, { isStatic: true, angle: Math.PI / 8, friction: 0.5, render: { fillStyle: '#334155' } }));
+        // 🚀 FIX: Ghost Collision fixed by adding 15px chamfer (rounded corners) and 0 static friction to the slope!
+        World.add(engine.world, Bodies.rectangle(WORLD_W / 2, WORLD_H / 2 + 100, WORLD_W * 0.8, 40, { 
+          isStatic: true, angle: Math.PI / 8, friction: 0, frictionStatic: 0, chamfer: { radius: 15 }, render: { fillStyle: '#334155' } 
+        }));
       }
       if (lesson === 5) {
-        const cradle = Composites.newtonsCradle(width / 2 - 100, 100, 5, 20, 200);
+        const cradle = Composites.newtonsCradle(WORLD_W / 2 - 100, 100, 5, 20, 200);
         World.add(engine.world, cradle);
       }
       if (lesson === 6) {
-        const pyramid = Composites.pyramid(width / 2, height - 300, 9, 10, 0, 0, (x, y) => Bodies.rectangle(x, y, 30, 30, { render: { fillStyle: '#d97706' } }));
+        const pyramid = Composites.pyramid(WORLD_W / 2, WORLD_H - 300, 9, 10, 0, 0, (x, y) => Bodies.rectangle(x, y, 30, 30, { render: { fillStyle: '#d97706' } }));
         World.add(engine.world, pyramid);
       }
       if (lesson === 7) {
-        const anchor = { x: width / 2, y: 300 };
+        const anchor = { x: WORLD_W / 2, y: 300 };
         const ball = Bodies.circle(anchor.x, anchor.y + 100, 30, { render: { fillStyle: '#f43f5e' } });
         const spring = Constraint.create({ pointA: anchor, bodyB: ball, stiffness: 0.05, render: { strokeStyle: '#64748b' } });
         World.add(engine.world, [ball, spring]);
       }
       if (lesson === 8) {
         const group = Matter.Body.nextGroup(true);
-        const bridge = Composites.stack(width * 0.2, height * 0.4, 10, 1, 0, 0, (x, y) => Bodies.rectangle(x, y, 50, 25, { collisionFilter: { group: group }, density: 0.05, render: { fillStyle: '#64748b' } }));
+        const bridge = Composites.stack(WORLD_W * 0.2, WORLD_H * 0.4, 10, 1, 0, 0, (x, y) => Bodies.rectangle(x, y, 50, 25, { collisionFilter: { group: group }, density: 0.05, render: { fillStyle: '#64748b' } }));
         Composites.chain(bridge, 0.5, 0, -0.5, 0, { stiffness: 0.9, length: 2, render: { visible: false } });
         World.add(engine.world, [
           bridge,
-          Constraint.create({ pointA: { x: width * 0.2, y: height * 0.4 }, bodyB: bridge.bodies[0], pointB: { x: -25, y: 0 }, stiffness: 0.9 }),
-          Constraint.create({ pointA: { x: width * 0.8, y: height * 0.4 }, bodyB: bridge.bodies[bridge.bodies.length - 1], pointB: { x: 25, y: 0 }, stiffness: 0.9 })
+          Constraint.create({ pointA: { x: WORLD_W * 0.2, y: WORLD_H * 0.4 }, bodyB: bridge.bodies[0], pointB: { x: -25, y: 0 }, stiffness: 0.9 }),
+          Constraint.create({ pointA: { x: WORLD_W * 0.8, y: WORLD_H * 0.4 }, bodyB: bridge.bodies[bridge.bodies.length - 1], pointB: { x: 25, y: 0 }, stiffness: 0.9 })
         ]);
       }
       if (lesson === 9) {
-        const softBody = Composites.softBody(width / 2, 100, 5, 5, 2, 2, true, 16, { restitution: 0.5, friction: 0.05, render: { fillStyle: '#10b981' } });
+        const softBody = Composites.softBody(WORLD_W / 2, 100, 5, 5, 2, 2, true, 16, { restitution: 0.5, friction: 0.05, render: { fillStyle: '#10b981' } });
         World.add(engine.world, softBody);
       }
       if (lesson === 10) {
         World.add(engine.world, [
-          Bodies.rectangle(width / 2 - 150, height / 2, 300, 20, { isStatic: true, angle: Math.PI / 6, render: { fillStyle: '#334155' } }),
-          Bodies.rectangle(width / 2 + 150, height / 2, 300, 20, { isStatic: true, angle: -Math.PI / 6, render: { fillStyle: '#334155' } })
+          Bodies.rectangle(WORLD_W / 2 - 150, WORLD_H / 2 + 100, 400, 40, { isStatic: true, angle: Math.PI / 6, chamfer: { radius: 15 }, frictionStatic: 0, render: { fillStyle: '#334155' } }),
+          Bodies.rectangle(WORLD_W / 2 + 150, WORLD_H / 2 + 100, 400, 40, { isStatic: true, angle: -Math.PI / 6, chamfer: { radius: 15 }, frictionStatic: 0, render: { fillStyle: '#334155' } })
         ]);
       }
     };
@@ -102,6 +156,7 @@ export default function Lab() {
     buildEnvironment();
 
     const mouse = Mouse.create(render.canvas);
+    mouseRef.current = mouse;
     const mouseConstraint = MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.2, render: { visible: false } } });
     World.add(engine.world, mouseConstraint);
 
@@ -109,7 +164,13 @@ export default function Lab() {
     const runner = Runner.create();
     Runner.run(runner, engine);
 
+    // Apply scaling immediately and on window resize
+    applyCameraView();
+    const handleResize = () => applyCameraView();
+    window.addEventListener('resize', handleResize);
+
     return () => {
+      window.removeEventListener('resize', handleResize);
       Render.stop(render);
       Runner.stop(runner);
       World.clear(engine.world);
@@ -118,30 +179,35 @@ export default function Lab() {
     };
   }, [lesson, resetTrigger]); 
 
+  // Re-apply zoom scale when the zoom state updates
+  useEffect(() => {
+    applyCameraView();
+  }, [zoom]);
+
   const spawn = (type) => {
     if (!engineRef.current) return;
     const { Bodies, World } = Matter;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const cx = w / 2 + (Math.random() * 50 - 25);
+    const cx = WORLD_W / 2 + (Math.random() * 50 - 25);
     let newBody;
 
     switch(type) {
-      case 'rubber': newBody = Bodies.circle(cx, 100, 40, { restitution: 0.95, render: { fillStyle: '#22d3ee' } }); break;
-      case 'bowling': newBody = Bodies.circle(cx, 100, 50, { restitution: 0.1, density: 0.05, render: { fillStyle: '#475569' } }); break;
-      case 'ice': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.001, chamfer: { radius: 4 }, render: { fillStyle: '#bae6fd' } }); break;
-      case 'wood': newBody = Bodies.rectangle(w * 0.2, 100, 50, 50, { friction: 0.4, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
-      case 'feather': newBody = Bodies.circle(w * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
-      case 'iron': newBody = Bodies.circle(w * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
-      case 'wrecking-ball': newBody = Bodies.circle(w * 0.3, h * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
+      case 'rubber': newBody = Bodies.circle(cx, 100, 40, { restitution: 0.95, frictionStatic: 0, friction: 0.001, render: { fillStyle: '#22d3ee' } }); break;
+      case 'bowling': newBody = Bodies.circle(cx, 100, 50, { restitution: 0.1, density: 0.05, frictionStatic: 0, render: { fillStyle: '#475569' } }); break;
+      case 'ice': 
+        newBody = Bodies.rectangle(WORLD_W * 0.2, 100, 50, 50, { friction: 0, frictionStatic: 0, inertia: Infinity, render: { fillStyle: '#bae6fd' } }); break;
+      case 'wood': 
+        newBody = Bodies.rectangle(WORLD_W * 0.2, 100, 50, 50, { friction: 0.5, frictionStatic: 0.2, chamfer: { radius: 4 }, render: { fillStyle: '#d97706' } }); break;
+      case 'feather': newBody = Bodies.circle(WORLD_W * 0.4, 100, 30, { frictionAir: 0.1, density: 0.001, render: { fillStyle: '#f8fafc' } }); break;
+      case 'iron': newBody = Bodies.circle(WORLD_W * 0.6, 100, 30, { frictionAir: 0.001, density: 0.05, render: { fillStyle: '#334155' } }); break;
+      case 'wrecking-ball': newBody = Bodies.circle(WORLD_W * 0.3, WORLD_H * 0.3, 60, { density: 0.1, restitution: 0.1, render: { fillStyle: '#1e293b' } }); break;
       case 'heavy-box': newBody = Bodies.rectangle(cx, 50, 60, 60, { density: 0.1, frictionAir: 0.01, chamfer: { radius: 4 }, render: { fillStyle: '#9333ea' } }); break;
       case 'particles': 
         for(let i=0; i<30; i++) World.add(engineRef.current.world, Bodies.circle(cx + (Math.random()*100-50), 50, 8, { render: { fillStyle: '#eab308' } }));
         break;
       case 'custom':
         const mat = materials[customMaterial];
-        const options = { restitution: mat.restitution, friction: mat.friction, density: mat.density * customMassMult, render: { fillStyle: mat.color } };
-        const startX = lesson === 2 ? w * 0.2 : cx;
+        const options = { restitution: mat.restitution, friction: mat.friction, frictionStatic: 0, density: mat.density * customMassMult, render: { fillStyle: mat.color } };
+        const startX = lesson === 2 ? WORLD_W * 0.2 : cx;
         if (customShape === 'circle') newBody = Bodies.circle(startX, 100, customSize, options);
         else if (customShape === 'square') newBody = Bodies.rectangle(startX, 100, customSize * 2, customSize * 2, { ...options, chamfer: { radius: 4 } });
         else if (customShape === 'triangle') newBody = Bodies.polygon(startX, 100, 3, customSize * 1.2, options);
@@ -174,7 +240,7 @@ export default function Lab() {
   const currentLesson = lessonData[lesson];
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
+    <div className="relative h-screen w-full overflow-hidden bg-slate-950">
       
       {showQuiz && currentLesson.quiz && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
@@ -187,8 +253,8 @@ export default function Lab() {
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
-            <p className="text-slate-300 mb-6 leading-relaxed">{currentLesson.quiz.question}</p>
-            <div className="space-y-3 mb-6">
+            <p className="text-slate-300 mb-6 leading-relaxed text-sm sm:text-base">{currentLesson.quiz.question}</p>
+            <div className="space-y-3 mb-6 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
               {currentLesson.quiz.options.map((opt, idx) => {
                 const isSelected = selectedAnswer === idx;
                 const isCorrect = idx === currentLesson.quiz.answer;
@@ -214,7 +280,7 @@ export default function Lab() {
                   <h4 className={`font-bold mb-1 ${quizState === 'correct' ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {quizState === 'correct' ? 'Correct!' : 'Not quite!'}
                   </h4>
-                  <p className="text-slate-300 text-sm leading-relaxed">{currentLesson.quiz.explanation}</p>
+                  <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">{currentLesson.quiz.explanation}</p>
                 </div>
               </div>
             )}
@@ -222,11 +288,9 @@ export default function Lab() {
         </div>
       )}
 
-      {/* 🚀 HUD Menu - Now shrink-wraps on desktop (sm:w-fit) and handles mobile safe zones */}
-      <div className="absolute top-4 left-4 right-4 sm:right-auto sm:left-6 sm:top-6 z-30 pointer-events-none flex justify-between items-start max-h-[85vh] overflow-y-auto custom-scrollbar max-w-[calc(100vw-32px)]">
-        
-        <div className={`bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl pointer-events-auto transition-all duration-300 ease-in-out w-full sm:w-fit min-w-[280px] sm:max-w-md ${isMinimized ? 'p-3 sm:p-4' : 'p-4 sm:p-6'}`}>
-          
+      {/* Main UI Menu */}
+      <div className="absolute top-4 left-4 right-4 sm:right-auto sm:left-6 sm:top-6 z-30 pointer-events-none flex justify-between items-start max-h-[60vh] sm:max-h-[85vh] overflow-y-auto custom-scrollbar max-w-[calc(100vw-32px)]">
+        <div className={`bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl pointer-events-auto transition-all duration-300 ease-in-out ${isMinimized ? 'w-fit p-3 sm:p-4' : 'w-full sm:w-fit min-w-[280px] sm:max-w-md p-4 sm:p-6'}`}>
           <div className={`flex items-center justify-between gap-4 ${isMinimized ? '' : 'mb-4 pb-4 border-b border-slate-800'}`}>
             <div className="flex items-center gap-2">
               {!isMinimized && (
@@ -270,7 +334,7 @@ export default function Lab() {
               {currentLesson.quiz && (
                 <div className="pt-4 border-t border-slate-800 mb-4">
                   <button onClick={() => setShowQuiz(true)} className="w-full flex justify-center items-center gap-2 py-2.5 bg-yellow-900/20 hover:bg-yellow-900/40 text-yellow-500 border border-yellow-700/50 rounded-lg text-sm font-semibold transition shadow-inner">
-                    <Lightbulb className="w-4 h-4" /> Test Your Knowledge
+                    <Lightbulb className="w-4 h-4" /> Test Knowledge
                   </button>
                 </div>
               )}
@@ -317,13 +381,26 @@ export default function Lab() {
         </div>
       </div>
 
-      {/* 🚀 FIXED: Added `touch-none` to prevent mobile webpage scrolling while interacting with physics */}
       <div ref={sceneRef} className="absolute inset-0 z-10 touch-none" />
 
-      {/* Repositioned for mobile thumbs */}
-      <button onClick={clearLab} className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
-        <RefreshCw className="w-4 h-4"/> Reset
-      </button>
+      {/* 🚀 NEW: Camera Zoom Controls + Reset Button grouped nicely! */}
+      <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex flex-col sm:flex-row items-end sm:items-center gap-3">
+        <div className="flex bg-slate-900/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-800 overflow-hidden">
+          <button onClick={() => setZoom(z => Math.max(z - 0.2, 0.4))} className="px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-800 transition border-r border-slate-700">
+            <ZoomOut className="w-5 h-5" />
+          </button>
+          <div className="px-3 flex items-center justify-center text-xs font-bold text-slate-400 min-w-[3rem]">
+            {Math.round(zoom * 100)}%
+          </div>
+          <button onClick={() => setZoom(z => Math.min(z + 0.2, 3))} className="px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-800 transition border-l border-slate-700">
+            <ZoomIn className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <button onClick={clearLab} className="flex items-center gap-2 px-4 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl shadow-lg backdrop-blur-md transition-all">
+          <RefreshCw className="w-5 h-5"/> <span className="hidden sm:inline font-semibold">Reset</span>
+        </button>
+      </div>
 
     </div>
   );
